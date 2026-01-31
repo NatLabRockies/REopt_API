@@ -126,7 +126,7 @@ function reopt(req::HTTP.Request)
                     :size_class, :electric_efficiency_half_load, :thermal_efficiency_half_load,
                     :macrs_option_years, :macrs_bonus_fraction, :federal_itc_fraction
                 ]
-                chp_dict = Dict(key=>getfield(model_inputs.s.chp, key) for key in inputs_with_defaults_from_julia_chp)
+                chp_dict = Dict(key=>getfield(model_inputs.s.chps[1], key) for key in inputs_with_defaults_from_julia_chp)
             else
                 chp_dict = Dict()
             end
