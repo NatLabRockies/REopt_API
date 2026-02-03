@@ -4939,6 +4939,13 @@ class CHPOutputs(BaseModel, models.Model):
         default=list, blank=True,
         help_text="Electric power serving the electric load time-series array [kW]"
     )
+    electric_curtailed_series_kw = ArrayField(
+        models.FloatField(
+            null=True, blank=True
+        ),
+        default=list, blank=True,
+        help_text="Electric power curtailed time-series array [kW]"
+    )
     thermal_to_storage_series_mmbtu_per_hour = ArrayField(
         models.FloatField(
             null=True, blank=True
