@@ -31,6 +31,7 @@ Classify the change according to the following categories:
 ##### Changed
 - refactor docker-compose files so that base-api-image isn't built twice (in celery and django sections), fixing error "image "docker.io/library/base-api-image:latest": already exists"
 - use REopt@0.57.0
+- URL updates due to NREL > NLR name change
 
 ## v3.17.5
 ### Minor Updates
