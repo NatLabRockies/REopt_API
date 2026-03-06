@@ -12,13 +12,13 @@ The REopt Julia package is the backend of the REopt API. That means that the opt
 - You want to be able to use the REopt model without incorporating an API call (and associated rate limits).
 - You want slightly more flexibility in how you interact with model inputs, optimization parameters, and run types.
 - You can install an optimization solver for use with REopt.
-- You do not need your results saved in an external database. 
-- **How do I use the REopt Julia package?:** see instructions [here](https://nrel.github.io/REopt.jl/dev/).
+- You do not need your results saved in an external database.
+- **How do I use the REopt Julia package?:** see instructions [here](https://natlabrockies.github.io/REopt.jl/dev/).
   
 **2. When and how to _modify_ the REopt Julia package:**
 - You want to make changes to the REopt model beyond modifying input values (e.g., add a new technology).
 - You want to suggest a bug fix in the REopt model.
-- **How do I modify the REopt Julia package?:** get the (free, open-source) model [here](https://github.com/NatLabRockies/REopt.jl) and see additional instructions [here](https://nrel.github.io/REopt.jl/dev/).
+- **How do I modify the REopt Julia package?:** get the (free, open-source) model [here](https://github.com/NatLabRockies/REopt.jl) and see additional instructions [here](https://natlabrockies.github.io/REopt.jl/dev/).
   
 **3. When and how to _use_ the REopt_API:**
 - You do not want to modify the code or host the API on your own server. 
