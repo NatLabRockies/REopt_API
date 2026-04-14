@@ -30,7 +30,7 @@ Classify the change according to the following categories:
 ## add-chp-dispatch-policies
 ### Minor updates
 ##### Added 
-- New `CHP` fields **serve_absorption_chiller_only**, **months_serving_absorption_chiller_only**, and **follow_electrical_load**
+- New `CHP` fields **serve_absorption_chiller_only**, **months_serving_absorption_chiller_only**, **follow_electrical_load**, and **include_cooling_in_chp_size**
 - New output `thermal_to_absorption_chiller_series_mmbtu_per_hour` added to heating technologies `CHPOutputs`, `ElectricHeaterOutputs`, `CSTOutputs`, `BoilerOutputs`, `SteamTurbineOutputs`, and `ExistingBoilerOutputs`, and new output `storage_to_absorption_chiller_series_mmbtu_per_hour` for `HotThermalStorageOutputs` and `HighTempThermalStorageOutputs`.  
 ### Changed
 - Updated heating dispatch results by separating heat flows to absorption chiller from heating load served (formerly, these were aggregated).
