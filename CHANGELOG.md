@@ -27,7 +27,7 @@ Classify the change according to the following categories:
     ### Patches
 
 
-## add-chp-dispatch-policies
+## Develop - YYYY-MM-DD
 ### Minor updates
 ##### Added 
 - New `CHP` fields **serve_absorption_chiller_only**, **months_serving_absorption_chiller_only**, **follow_electrical_load**, and **include_cooling_in_chp_size**
