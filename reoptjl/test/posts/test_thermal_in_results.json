@@ -63,7 +63,7 @@
         "cooling_thermal_factor": 0.8,
         "follow_electrical_load": false,
         "serve_absorption_chiller_only":false,
-        "months_serving_absorption_chiller":[]
+        "months_serving_absorption_chiller_only":[]
     },
     "HotThermalStorage": {
         "min_gal": 2500,
