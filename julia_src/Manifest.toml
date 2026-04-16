@@ -948,11 +948,9 @@ version = "1.11.0"
 
 [[deps.REopt]]
 deps = ["ArchGDAL", "CSV", "CoolProp", "DataFrames", "Dates", "DelimitedFiles", "HTTP", "JLD", "JSON", "JuMP", "LinDistFlow", "LinearAlgebra", "Logging", "MathOptInterface", "Requires", "Roots", "Statistics", "TestEnv"]
-git-tree-sha1 = "b4b50f8909ea73c613d0e265e46851687a406aad"
-repo-rev = "electric_storage_size_class"
-repo-url = "https://github.com/NREL/REopt.jl.git"
+git-tree-sha1 = "50654a593a8b356cdf28043c6a1d7c3ee7cd28db"
 uuid = "d36ad4e8-d74a-4f7a-ace1-eaea049febf6"
-version = "0.56.3"
+version = "0.57.0"
 
 [[deps.Random]]
 deps = ["SHA"]

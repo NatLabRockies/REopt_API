@@ -20,7 +20,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: base-api-image
+    image: base-api-image:latest
     command:  >
       "celery -A reopt_api worker -l info"
     environment:
@@ -36,10 +36,7 @@ services:
       - julia
 
   django:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: base-api-image
+    image: base-api-image:latest
     command:  >
       "python manage.py migrate
       && /opt/reopt/bin/wait-for-it.bash -t 0 julia:8081 -- python manage.py runserver 0.0.0.0:8000"
@@ -52,6 +49,7 @@ services:
       - db
       - redis
       - julia
+      - celery
     ports:
       - 8000:8000
     volumes:

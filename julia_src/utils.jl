@@ -19,7 +19,7 @@ function filter_dict_to_match_struct_field_names(d::Dict, s::DataType)
         end
     end
     return d2
-end
+end 
 
 """
     array_of_array_to_2D_array(aa)

@@ -866,7 +866,7 @@ HTTP.register!(ROUTER, "GET", "/avert_emissions_profile", avert_emissions_profil
 HTTP.register!(ROUTER, "GET", "/cambium_profile", cambium_profile)
 HTTP.register!(ROUTER, "GET", "/easiur_costs", easiur_costs)
 HTTP.register!(ROUTER, "GET", "/sector_defaults", sector_defaults)
-HTTP.register!(ROUTER, "GET", "/simulated_load", simulated_load)
+HTTP.register!(ROUTER, "POST", "/simulated_load", simulated_load)
 HTTP.register!(ROUTER, "GET", "/absorption_chiller_defaults", absorption_chiller_defaults)
 HTTP.register!(ROUTER, "GET", "/ghp_efficiency_thermal_factors", ghp_efficiency_thermal_factors)
 HTTP.register!(ROUTER, "GET", "/ground_conductivity", ground_conductivity)

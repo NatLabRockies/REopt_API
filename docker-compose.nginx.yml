@@ -26,7 +26,7 @@ services:
     container_name: celery-nginx
     build:
       context: .
-    image: base-api-image
+    image: base-api-image:latest
     command: >
       "celery -A reopt_api worker -l info"
     environment:
@@ -44,7 +44,7 @@ services:
       - julia-nginx
 
   django-nginx:
-    image: base-api-image
+    image: base-api-image:latest
     container_name: django-nginx
     command: >
       "python manage.py migrate

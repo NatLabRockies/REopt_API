@@ -26,6 +26,12 @@ Classify the change according to the following categories:
     ##### Removed
     ### Patches
 
+## v3.18.0
+### Minor Updates
+##### Changed
+- refactor docker-compose files so that base-api-image isn't built twice (in celery and django sections), fixing error "image "docker.io/library/base-api-image:latest": already exists"
+- use REopt@0.57.0 (updates to federal sector defaults based on the 2025 NIST Handbook and Annual Supplement; include boiler emissions in emissions calculations)
+
 ## v3.17.5
 ### Minor Updates
 ##### Added
