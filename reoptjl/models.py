@@ -4617,7 +4617,7 @@ class CHPInputs(BaseModel, models.Model):
         help_text="Boolean indicator if CHP can supply steam to the steam turbine for electric production"   
     )
     serve_absorption_chiller_only = models.BooleanField(
-        default=True,
+        default=False,
         null=True, 
         blank=True,
         help_text="Boolean indicator if CHP produced heat either serves absorption chiller or sends it to waste"   
@@ -4634,16 +4634,10 @@ class CHPInputs(BaseModel, models.Model):
         help_text="Months of the year in which the CHP only serves the absorption chiller load, only used if serve_absorption_chiller_only is True"
     )
     follow_electrical_load = models.BooleanField(
-        default=True,
+        default=False,
         null=True, 
         blank=True,
         help_text="Boolean indicator if CHP follows the electrical load by running at capacity or meeting the load only"   
-    )
-    include_cooling_in_chp_size = models.BooleanField(
-        default=True,
-        null=True, 
-        blank=True,
-        help_text="Boolean indicator if cooling load (via absorption chiller) is included in the heuristic CHP sizing calculation along with heating loads"   
     )
     can_serve_dhw = models.BooleanField(
         default=True,
@@ -9083,6 +9077,7 @@ class GHPOutputs(BaseModel, models.Model):
     ghx_residual_value_present_value = models.FloatField(null=True, blank=True)
     thermal_to_space_heating_load_series_mmbtu_per_hour = ArrayField(models.FloatField(null=True, blank=True), default=list, null=True, blank=True)
     thermal_to_dhw_load_series_mmbtu_per_hour = ArrayField(models.FloatField(null=True, blank=True), default=list, null=True, blank=True)
+    thermal_to_load_series_mmbtu_per_hour = ArrayField(models.FloatField(null=True, blank=True), default=list, null=True, blank=True)
     thermal_to_load_series_ton = ArrayField(models.FloatField(null=True, blank=True), default=list, null=True, blank=True)
     avoided_capex_by_ghp_present_value = models.FloatField(null=True, blank=True) 
     annual_thermal_production_mmbtu = models.FloatField(null=True, blank=True)
