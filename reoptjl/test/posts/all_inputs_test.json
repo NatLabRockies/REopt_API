@@ -48,8 +48,8 @@
         "normalize_and_scale_load_profile_input": false
     },
     "Site": {
-        "latitude": 38.96345294964369,
-        "longitude": -77.38406208630109,
+        "latitude": 37.749,
+        "longitude": -122.4194,
         "land_acres": 1.0e5,
         "roof_squarefeet": null,
         "CO2_emissions_reduction_min_fraction": null,
@@ -424,8 +424,8 @@
         "charge_storage_only": false        
     },
     "HighTempThermalStorage": {
-        "min_kwh": 50.0,
-        "max_kwh": 50.0,
+        "min_kwh": 0.0,
+        "max_kwh": 0.0,
         "installed_cost_per_kwh": 86.0,
         "macrs_option_years": 5,
         "macrs_bonus_fraction": 1.0,
