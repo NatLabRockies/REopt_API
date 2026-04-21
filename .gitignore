@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+keys.py
+.env
 .idea
 input_files/*
 !input_files/**/

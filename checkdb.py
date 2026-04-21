@@ -1,6 +1,6 @@
 import psycopg2
 import os
-from keys import *
+from keys_env import *
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 env = os.getenv('APP_ENV')

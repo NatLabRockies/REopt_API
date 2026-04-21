@@ -4,7 +4,7 @@ import os
 import logging
 from celery import Celery
 from celery.signals import after_setup_logger
-from keys import *
+from keys_env import *
 
 # set the default Django settings module for the 'celery' program.
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'reopt_api.settings')

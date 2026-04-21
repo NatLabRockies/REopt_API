@@ -1,3 +1,4 @@
+import os
 
 rollbar_access_token = os.getenv('SECRET_ROLLBAR_ACCESS_TOKEN', 'test')
 

@@ -1,8 +1,9 @@
 # REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NREL/REopt_API/blob/master/LICENSE.
-from keys import *
+from keys_env import *
 import os
 import django
 import rollbar
+import sys
 
 """
 Django settings for reopt_api project.
@@ -123,9 +124,9 @@ USE_TZ = True
 # Results backend
 CELERY_RESULT_BACKEND = 'django-db'
 
-if APP_ENV == 'staging'
+if APP_ENV == 'staging':
     CELERY_WORKER_MAX_MEMORY_PER_CHILD = 6000000 # 6 GB
-else
+else:
     CELERY_WORKER_MAX_MEMORY_PER_CHILD = 4000000 # 4 GB
 
 if 'test' in sys.argv:

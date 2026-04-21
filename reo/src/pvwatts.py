@@ -1,7 +1,7 @@
 # REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NREL/REopt_API/blob/master/LICENSE.
 import requests
 import json
-import keys
+import keys_env
 import logging
 from reo.exceptions import PVWattsDownloadError
 log = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class PVWatts:
 
     def __init__(self,
                  url_base="https://developer.nrel.gov/api/pvwatts/v6.json",
-                 key=keys.developer_nrel_gov_key,
+                 key=keys_env.developer_nrel_gov_key,
                  azimuth=180,
                  system_capacity=1,
                  losses=0.14,

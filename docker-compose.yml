@@ -31,7 +31,11 @@ services:
       - DB_PASSWORD=reopt
       - DB_SEARCH_PATH=public
       - REDIS_HOST=redis
+      - REDIS_PASSWORD=
       - NLR_API_KEY
+    env_file:
+      - path: .env
+        required: false
     volumes:
       - .:/opt/reopt
     depends_on:
@@ -52,7 +56,11 @@ services:
       - DB_PASSWORD=reopt
       - DB_SEARCH_PATH=public
       - REDIS_HOST=redis
+      - REDIS_PASSWORD=
       - NLR_API_KEY
+    env_file:
+      - path: .env
+        required: false
     depends_on:
       - db
       - redis

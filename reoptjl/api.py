@@ -17,7 +17,7 @@ from reo.exceptions import UnexpectedError, REoptError
 from ghpghx.models import GHPGHXInputs
 from django.core.exceptions import ValidationError
 from reoptjl.models import APIMeta
-import keys
+import keys_env
 log = logging.getLogger(__name__)
  
 
@@ -74,7 +74,7 @@ class Job(ModelResource):
     def obj_create(self, bundle, **kwargs):
         run_uuid = str(uuid.uuid4())
         # Attempt to get POSTed api_key assigned to APIMeta.api_key (or try method below for user_uuid)
-        api_key = keys.developer_nrel_gov_key #bundle.request.GET.get("api_key", "")
+        api_key = keys_env.developer_nrel_gov_key #bundle.request.GET.get("api_key", "")
         if 'user_uuid' in bundle.data.keys():
 
             if type(bundle.data['user_uuid']) == str:
