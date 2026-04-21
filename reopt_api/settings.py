@@ -16,6 +16,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.2/ref/settings/
 """
 
+APP_ENV = os.getenv('APP_ENV', os.getenv('DEPLOY_ENV', 'development'))
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -87,15 +89,23 @@ WSGI_APPLICATION = 'reopt_api.wsgi.application'
 DATABASES = {
     'default':{
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'HOST': prod_database_host,
-        'NAME': prod_database_name,
+        'HOST': db_host,
+        'NAME': db_name,
         'OPTIONS': {
-            'options': '-c search_path=reopt_api'
+            'options': '-c search_path=' + db_search_path
         },
-        'USER': production_user,
-        'PASSWORD': production_user_password,
+        'USER': db_username,
+        'PASSWORD': db_password,
     }
 }
+if 'test' in sys.argv or APP_ENV == 'local':
+    DATABASES['default']['NAME'] = 'reopt'
+    DATABASES['default']['USER'] = 'reopt'
+    DATABASES['default']['PASSWORD'] = 'reopt'
+    DATABASES['default']['OPTIONS'] = {
+        'options': '-c search_path=public'
+    }
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/
@@ -113,7 +123,15 @@ USE_TZ = True
 # Results backend
 CELERY_RESULT_BACKEND = 'django-db'
 
-CELERY_WORKER_MAX_MEMORY_PER_CHILD = 4000000  # 4 GB
+if APP_ENV == 'staging'
+    CELERY_WORKER_MAX_MEMORY_PER_CHILD = 6000000 # 6 GB
+else
+    CELERY_WORKER_MAX_MEMORY_PER_CHILD = 4000000 # 4 GB
+
+if 'test' in sys.argv:
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES_EXCEPTIONS = False
+
 # we have been resetting celery workers by max memory due to a memory growth problem.
 # this problem may be fixed by removing PyJulia, but can't view Rancher metrics yet.
 # Once we can confirm that we no longer have a memory grwoth issue we can disable this setting.
@@ -141,14 +159,19 @@ CELERY_IMPORTS = (
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
-STATIC_URL = '/'
+if APP_ENV == 'development':
+    STATIC_URL = '/static/'
+else:
+    STATIC_URL = '/'
 
 ROLLBAR = {
     'access_token': rollbar_access_token,
-    'environment': 'production',
+    'environment': APP_ENV,
     'root': BASE_DIR,
     'branch': os.environ.get('BRANCH_NAME')
 }
+if 'test' in sys.argv or APP_ENV == 'local':
+    ROLLBAR['enabled'] = False
 
 rollbar.init(**ROLLBAR)
 
@@ -156,5 +179,5 @@ APPEND_SLASH = False
 TASTYPIE_ALLOW_MISSING_SLASH = True
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "reopt_api.production_settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "reopt_api.settings")
 django.setup()

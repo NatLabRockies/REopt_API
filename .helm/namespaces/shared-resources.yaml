@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ .Env.DEPLOY_SHARED_RESOURCES_NAMESPACE_NAME }}
-  annotations:
-    field.cattle.io/projectId: {{ .Env.RANCHER_PROJECT_ID }}
-    field.cattle.io/resourceQuota: '{"limit":{"pods":"{{ .Env.DEPLOY_SHARED_RESOURCES_NAMESPACE_POD_LIMIT }}"}}'

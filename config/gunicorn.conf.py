@@ -37,14 +37,4 @@ timeout = 435
 
 # Set the appropriate DJANGO_SETTINGS_MODULE environment variable based on the
 # current environment.
-env = os.environ['APP_ENV']
-if env == 'development':
-    raw_env = ['DJANGO_SETTINGS_MODULE=reopt_api.dev_settings']
-elif env == 'staging':
-    raw_env = ['DJANGO_SETTINGS_MODULE=reopt_api.staging_settings']
-elif env == 'production':
-    raw_env = ['DJANGO_SETTINGS_MODULE=reopt_api.production_settings']
-elif env == 'internal_c110p':
-    raw_env = ['DJANGO_SETTINGS_MODULE=reopt_api.internal_c110p_settings']
-else:
-    raw_env = ['DJANGO_SETTINGS_MODULE=reopt_api.dev_settings']
+raw_env = ['DJANGO_SETTINGS_MODULE=reopt_api.settings']

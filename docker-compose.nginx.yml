@@ -31,11 +31,15 @@ services:
       "celery -A reopt_api worker -l info"
     environment:
       - APP_ENV=local
-      - SQL_HOST=db-nginx
-      - SQL_PORT=5432
+      - DB_HOST=db-nginx
+      - DB_NAME=reopt
+      - DB_USERNAME=reopt
+      - DB_PASSWORD=reopt
+      - DB_SEARCH_PATH=public
       - REDIS_HOST=redis-nginx
       - SOLVER=xpress
       - JULIA_HOST=julia-nginx
+      - NLR_API_KEY
     volumes:
       - .:/opt/reopt
     depends_on:
@@ -51,11 +55,15 @@ services:
       && /opt/reopt/bin/wait-for-it.bash -t 0 julia-nginx:8081 -- python manage.py runserver 0.0.0.0:8000"
     environment:
       - APP_ENV=local
-      - SQL_HOST=db-nginx
-      - SQL_PORT=5432
+      - DB_HOST=db-nginx
+      - DB_NAME=reopt
+      - DB_USERNAME=reopt
+      - DB_PASSWORD=reopt
+      - DB_SEARCH_PATH=public
       - REDIS_HOST=redis-nginx
       - SOLVER=xpress
       - JULIA_HOST=julia-nginx
+      - NLR_API_KEY
     depends_on:
       - db-nginx
       - redis-nginx
