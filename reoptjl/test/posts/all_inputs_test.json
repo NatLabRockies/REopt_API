@@ -424,8 +424,8 @@
         "charge_storage_only": false        
     },
     "HighTempThermalStorage": {
-        "min_kwh": 0.0,
-        "max_kwh": 0.0,
+        "min_kwh": 50.0,
+        "max_kwh": 50.0,
         "installed_cost_per_kwh": 86.0,
         "macrs_option_years": 5,
         "macrs_bonus_fraction": 1.0,
