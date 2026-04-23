@@ -1,4 +1,5 @@
 .git
+.git*
 env/
 *.pyc
 *.rdb
@@ -15,4 +16,5 @@ werf.yaml
 **/*.dylib
 **/*.dll
 Dockerfile*
+.dockerignore
 /config/deploy
