@@ -46,7 +46,7 @@ jobs:
     uses: TADA/deploy-action/.github/workflows/undeploy-closed-prs.yml@v2
     with:
       base-metadata: ${{ needs.deploy-metadata.outputs.staging-metadata }}
-      vault-kubeconfig-path: secret/data/deploy/staging/on-prem-rancher-test-ponderosa-cluster-test
+      vault-kubeconfig-path: secret/data/deploy/staging/on-prem-rancher-test-ponderosa-cluster-test-reopt
       vault-db-superuser-path: secret/data/reopt-db/staging/db-superuser
     secrets:
       vault-role-id: ${{ secrets.VAULT_ROLE_ID }}

@@ -42,9 +42,9 @@ jobs:
       images: |
         tada/reopt-api
       clusters: |
-        - vault-kubeconfig-path: secret/data/deploy/staging/on-prem-rancher-test-ponderosa-cluster-test
+        - vault-kubeconfig-path: secret/data/deploy/staging/on-prem-rancher-test-ponderosa-cluster-test-reopt
           rancher-project-id: ${{ fromJSON(needs.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).staging_rancher_project_id }}
-        - vault-kubeconfig-path: secret/data/deploy/production/on-prem-rancher-ponderosa-cluster-production
+        - vault-kubeconfig-path: secret/data/deploy/production/on-prem-rancher-ponderosa-cluster-reopt
           rancher-project-id: ${{ fromJSON(needs.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).production_rancher_project_id }}
     secrets:
       vault-role-id: ${{ secrets.VAULT_ROLE_ID }}

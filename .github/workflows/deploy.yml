@@ -77,7 +77,7 @@ jobs:
     uses: TADA/deploy-action/.github/workflows/undeploy-branch.yml@v2
     with:
       metadata: ${{ needs.deploy-metadata.outputs.staging-metadata }}
-      vault-kubeconfig-path: secret/data/deploy/staging/on-prem-rancher-test-ponderosa-cluster-test
+      vault-kubeconfig-path: secret/data/deploy/staging/on-prem-rancher-test-ponderosa-cluster-test-reopt
       vault-db-superuser-path: secret/data/reopt-db/staging/db-superuser
     secrets:
       vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
@@ -92,7 +92,7 @@ jobs:
     with:
       metadata: ${{ needs.deploy-metadata.outputs.staging-metadata }}
       vault-registry-credentials-path: secret/data/deploy/common/aws-ecr
-      vault-kubeconfig-path: secret/data/deploy/staging/on-prem-rancher-test-ponderosa-cluster-test
+      vault-kubeconfig-path: secret/data/deploy/staging/on-prem-rancher-test-ponderosa-cluster-test-reopt
     secrets:
       vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
       vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
@@ -107,7 +107,7 @@ jobs:
     with:
       metadata: ${{ needs.deploy-metadata.outputs.production-metadata }}
       vault-registry-credentials-path: secret/data/deploy/common/aws-ecr
-      vault-kubeconfig-path: secret/data/deploy/production/on-prem-rancher-ponderosa-cluster-production
+      vault-kubeconfig-path: secret/data/deploy/production/on-prem-rancher-ponderosa-cluster-reopt
     secrets:
       vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
       vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
