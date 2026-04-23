@@ -1,0 +1,404 @@
+import "./AppKbldConfig.pkl"
+import "@k8s/K8sResource.pkl"
+import "@k8s/api/core/v1/EnvFromSource.pkl"
+import "@k8s/api/apps/v1/StatefulSet.pkl"
+import "@tadaSharedKube/TadaAppNamespace.pkl"
+import "@tadaSharedKube/TadaEcrLoginRenewConfigMap.pkl"
+import "@tadaSharedKube/TadaEcrLoginRenewCronJob.pkl"
+import "@tadaSharedKube/TadaEcrLoginRenewInitialSetupJob.pkl"
+import "@tadaSharedKube/TadaEcrLoginRenewRoleBinding.pkl"
+import "@tadaSharedKube/TadaEcrLoginRenewRole.pkl"
+import "@tadaSharedKube/TadaEcrLoginRenewSecrets.pkl"
+import "@tadaSharedKube/TadaEcrLoginRenewServiceAccount.pkl"
+import "@tadaSharedKube/TadaWebConfigMap.pkl"
+import "@tadaSharedKube/TadaWebDbMigrateJob.pkl"
+import "@tadaSharedKube/TadaWebDbMigrateSecrets.pkl"
+import "@tadaSharedKube/TadaWebDeployment.pkl"
+import "@tadaSharedKube/TadaWebIngress.pkl"
+import "@tadaSharedKube/TadaWebPodDisruptionBudget.pkl"
+import "@tadaSharedKube/TadaWebSecrets.pkl"
+import "@tadaSharedKube/TadaWebService.pkl"
+
+local deployMetadata = import("@tadaSharedKube/tadaDeployMetadata.pkl").deployMetadata
+local containerImage = "reopt-api"
+
+resources: Listing<K8sResource> = new {
+  new TadaAppNamespace {
+    when (deployMetadata.`deploy-env` == "production") {
+      tadaRancherResourceQuotaPodLimit = 70
+    } else {
+      tadaRancherResourceQuotaPodLimit = 20
+    }
+  }
+
+  new AppKbldConfig {}
+
+  // To be able to pull images from our ECR repos in our on-premise (non-AWS)
+  // clusters.
+  local ecrLoginRenewConfigMapResource = new TadaEcrLoginRenewConfigMap {}
+  ecrLoginRenewConfigMapResource
+  new TadaEcrLoginRenewCronJob {}
+  new TadaEcrLoginRenewInitialSetupJob {}
+  new TadaEcrLoginRenewRoleBinding {}
+  new TadaEcrLoginRenewRole {}
+  new TadaEcrLoginRenewSecrets {}
+  new TadaEcrLoginRenewServiceAccount {}
+
+  local webConfigMap = new TadaWebConfigMap {
+    data {
+      ["APP_ENV"] = deployMetadata.`deploy-env`
+      ["BRANCH_NAME"] = deployMetadata.`branch-name`
+      ["JULIA_HOST"] = "julia-service.svc.cluster.local"
+      ["REDIS_HOST"] = "redis-service.svc.cluster.local"
+      ["K8S_DEPLOY"] = "true"
+
+      when (deployMetadata.`branch-is-primary` == "false") {
+        ["DB_NAME"] = deployMetadata.`branch-db-name`
+        // Use the database name as the queue name so that separate branches or
+        // databases on staging remain in separate queues.
+        ["APP_QUEUE_NAME"] = deployMetadata.`branch-db-name`
+      } else {
+        // In production (or where the database name isn't explicitly
+        // overridden), just use the app env as the queue name.
+        ["APP_QUEUE_NAME"] = deployMetadata.`deploy-env`
+      }
+    }
+  }
+  webConfigMap
+
+  local webSecrets = new TadaWebSecrets {}
+  webSecrets
+
+  new TadaWebDbMigrateSecrets {}
+
+  new TadaWebDbMigrateJob {
+    tadaContainerImage = containerImage
+    tadaImagePullSecretName = ecrLoginRenewConfigMapResource.imagePullSecretName
+
+    spec {
+      template {
+        spec {
+          containers {
+            [[ name == "web" ]] {
+              args = new {
+                "bin/migrate"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Deployment for the Django APIs.
+  local djangoDeployment = new TadaWebDeployment {
+    tadaName = "django"
+    tadaContainerImage = containerImage
+    tadaImagePullSecretName = ecrLoginRenewConfigMapResource.imagePullSecretName
+
+    tadaResourceLimitCpu = "2000m"
+    tadaResourceLimitMemory = 2000.mib
+
+    when (deployMetadata.`deploy-env` == "production") {
+      tadaReplicaCount = 10
+      tadaResourceRequestCpu = "1000m"
+      tadaResourceRequestMemory = 2000.mib
+    } else {
+      tadaResourceRequestCpu = "500m"
+      tadaResourceRequestMemory = 700.mib
+      tadaResourceLimitMemory = 700.mib
+    }
+
+    tadaContainerPort = 8000
+    tadaHealthProbePath = "/_health"
+
+    spec {
+      template {
+        spec {
+          containers {
+            [[ name == tadaName ]] {
+              args = new {
+                "bin/server"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  djangoDeployment
+
+  // Deployment for the standalone Julia containers. These have lower memory
+  // limits since they're only used for lighterweight API requests from the
+  // Django app. The primary Julia containers are separate pods on the Celery
+  // deployment.
+  local juliaDeployment = new TadaWebDeployment {
+    tadaName = "julia"
+    tadaContainerImage = containerImage
+    tadaImagePullSecretName = ecrLoginRenewConfigMapResource.imagePullSecretName
+
+    tadaResourceLimitCpu = "4000m"
+    tadaResourceLimitMemory = 2000.mib
+    tadaResourceRequestMemory = 2000.mib
+
+    when (deployMetadata.`deploy-env` == "production") {
+      tadaReplicaCount = 5
+      tadaResourceRequestCpu = "2000m"
+    } else {
+      tadaResourceRequestCpu = "500m"
+    }
+
+    tadaContainerPort = 8081
+    tadaHealthProbePath = "/health"
+
+    spec {
+      template {
+        spec {
+          containers {
+            [[ name == tadaName ]] {
+              args = new {
+                "julia" "--project=/opt/julia_src" "http.jl"
+              }
+
+              // Overwrite to remove default web-secrets from list, since Julia
+              // container doesn't need secrets access.
+              envFrom = new Listing<EnvFromSource> {
+                new {
+                  configMapRef {
+                    name = webConfigMap.metadata.name
+                  }
+                }
+              }
+
+              env {
+                new {
+                  name = "JULIA_NUM_THREADS"
+                  value = "4"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  juliaDeployment
+
+  // Deployment for the Celery workers, which also includes Julia pods deployed
+  // in tandem so there's always a one-to-one relationship between Celery
+  // worker pods and a dedicated Julia pod.
+  new TadaWebDeployment {
+    tadaName = "celery"
+    tadaContainerImage = containerImage
+    tadaImagePullSecretName = ecrLoginRenewConfigMapResource.imagePullSecretName
+
+    tadaResourceLimitCpu = "1000m"
+    tadaResourceRequestCpu = "100m"
+    tadaResourceLimitMemory = 1600.mib
+    tadaResourceRequestMemory = 1600.mib
+
+    when (deployMetadata.`deploy-env` == "production") {
+      tadaReplicaCount = 10
+    }
+
+    spec {
+      template {
+        spec {
+          containers {
+            [[ name == tadaName ]] {
+              args = new {
+                "bin/worker"
+              }
+
+              env {
+                new {
+                  name = "JULIA_HOST"
+                  value = "localhost"
+                }
+              }
+
+              startupProbe {
+                httpGet = null
+                exec {
+                  command = new {
+                    "pgrep" "-f" "bin/celery"
+                  }
+                }
+              }
+
+              readinessProbe {
+                httpGet = null
+                exec {
+                  command = new {
+                    "pgrep" "-f" "bin/celery"
+                  }
+                }
+              }
+
+              livenessProbe {
+                httpGet = null
+                exec {
+                  command = new {
+                    "pgrep" "-f" "bin/celery"
+                  }
+                }
+              }
+            }
+
+            // Add an extra pod for the Julia container. We will leverage the
+            // standalone Julia deployment's container definition, but tweaked
+            // for different resource limits, since these are the more resource
+            // intenstive areas.
+            (juliaDeployment.spec.template.spec.containers[0]) {
+              resources {
+                requests {
+                  when (deployMetadata.`deploy-env` == "production") {
+                    ["memory"] = 12000.mib
+                  } else {
+                    ["memory"] = 6000.mib
+                  }
+                }
+
+                limits {
+                  when (deployMetadata.`deploy-env` == "production") {
+                    ["memory"] = 12000.mib
+                  } else {
+                    ["memory"] = 6000.mib
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  new StatefulSet {
+    metadata {
+      name = "redis-stateful-set"
+
+      labels {
+        ["app"] = "redis"
+      }
+
+      annotations {
+        ["kapp.k14s.io/change-group"] = "change-group/deployment"
+      }
+    }
+
+    spec {
+      selector {
+        matchLabels {
+          ["app"] = "redis"
+        }
+      }
+
+      replicas = 1
+
+      template {
+        metadata {
+          labels {
+            ["app"] = "redis"
+          }
+        }
+
+        spec {
+          imagePullSecrets {
+            new {
+              name = ecrLoginRenewConfigMapResource.imagePullSecretName
+            }
+          }
+
+          containers {
+            new {
+              name = "redis"
+
+              image = "public.ecr.aws/docker/library/redis:6.2.21-alpine"
+
+              args = new {
+                 "sh" "-c" "redis-server --requirepass $$SECRET_REDIS_PASSWORD --save 900 1 --save 300 10 --save 60 10000 --appendonly yes --maxmemory 2048mb --maxmemory-policy allkeys-lru"
+              }
+
+              env {
+                new {
+                  name = "SECRET_REDIS_PASSWORD"
+                  valueFrom {
+                    secretKeyRef {
+                      name = webSecrets.metadata.name
+                      key = "SECRET_REDIS_PASSWORD"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  local djangoService = new TadaWebService {
+    tadaName = "django"
+    tadaAppLabel = "django"
+    tadaPort = 8000
+  }
+  djangoService
+
+  local juliaService = new TadaWebService {
+    tadaName = "julia"
+    tadaAppLabel = "julia"
+    tadaPort = 8081
+  }
+  juliaService
+
+  new TadaWebService {
+    tadaName = "redis"
+    tadaAppLabel = "redis"
+    tadaPort = 6379
+  }
+
+  new TadaWebIngress {
+    tadaServiceName = djangoService.metadata.name
+    tadaServicePort = 8000
+
+    // Configure the ingress on `main` to listen on the old `*.nrel.gov`
+    // domains (in addition to the new `nlr.gov` domains). We can remove this
+    // once the nrel.gov domain is fully gone.
+    when (deployMetadata.`deploy-env` == "production" || (deployMetadata.`deploy-env` == "staging" && deployMetadata.`branch-is-primary` == "true")) {
+      local nrelHost = deployMetadata.`url-host`.replaceLast(".nlr.gov", ".nrel.gov")
+      spec {
+        rules {
+          new {
+            host = nrelHost!!
+            http {
+              paths {
+                new {
+                  path = "/"
+                  pathType = "Prefix"
+                  backend {
+                    service {
+                      name = djangoService.metadata.name
+                      port {
+                        number = 8000
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  new TadaWebPodDisruptionBudget {}
+}
+
+output {
+  value = resources
+  renderer = (K8sResource.output.renderer as YamlRenderer) {
+    isStream = true
+  }
+}

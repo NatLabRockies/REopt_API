@@ -1,0 +1,62 @@
+#!/usr/bin/env ruby
+
+require "json"
+require "open3"
+require "rake"
+require "shellwords"
+
+# Install dependencies.
+sh "vendir sync --chdir #{Shellwords.escape(__dir__)} --locked 1>&2"
+sh "pkl project resolve --working-dir #{Shellwords.escape(__dir__)} 1>&2"
+
+# Parse metadata generated from GitHub Actions.
+deploy_metadata = JSON.parse(ENV.fetch("DEPLOY_METADATA", "{}"))
+deploy_env = deploy_metadata.fetch("deploy-env", "development")
+
+# Generate decrypted secrets file.
+output, status = Open3.capture2(
+  {"DEPLOY_ENV" => deploy_env},
+  "gomplate",
+  "--config", File.expand_path("../../.gomplate.yaml", __dir__),
+  "--file", File.expand_path("../../config/vault_secrets.json.tmpl", __dir__)
+)
+raise "gomplate error: #{output.inspect}" unless status.success?
+ENV["DEPLOY_SECRETS"] = output
+
+# Generate decrypted secrets file for the database migration environment (which
+# contain extra values we don't normally want to expose).
+output, status = Open3.capture2(
+  {"DEPLOY_ENV" => deploy_env, "DB_MIGRATE" => "true"},
+  "gomplate",
+  "--config", File.expand_path("../../.gomplate.yaml", __dir__),
+  "--file", File.expand_path("../../config/vault_secrets.json.tmpl", __dir__)
+)
+raise "gomplate error: #{output.inspect}" unless status.success?
+ENV["DEPLOY_DB_MIGRATE_SECRETS"] = output
+
+# Generate decrypted secrets file for the database migration environment (which
+# contain extra values we don't normally want to expose).
+output, status = Open3.capture2(
+  {"DEPLOY_ENV" => deploy_env, "ECR_LOGIN_RENEW" => "true"},
+  "gomplate",
+  "--config", File.expand_path("../../.gomplate.yaml", __dir__),
+  "--file", File.expand_path("../../config/vault_secrets.json.tmpl", __dir__)
+)
+raise "gomplate error: #{output.inspect}" unless status.success?
+ENV["DEPLOY_ECR_LOGIN_RENEW_SECRETS"] = output
+
+# Render the Kubernetes YAML output.
+case ENV["RENDER_JOB"]
+when "run-job"
+  sh "pkl", "eval",
+    "--working-dir", __dir__,
+    "--format", "yaml",
+    File.expand_path("./RunJob.pkl", __dir__)
+when nil
+  sh "pkl", "eval",
+    "--working-dir", __dir__,
+    "--format", "yaml",
+    File.expand_path("./WebDeployment.pkl", __dir__)
+else
+  raise "Unknown RENDER_JOB=#{ENV["RENDER_JOB"].inspect}"
+end

@@ -1,0 +1,112 @@
+name: Deploy
+
+on:
+  push:
+    branches: "**"
+  pull_request:
+    types:
+      - closed
+      - labeled
+      - reopened
+      - unlabeled
+  workflow_dispatch:
+
+concurrency:
+  # Concurrency group is more complicated in this case because:
+  # 1. This gets triggered by both `push` and `pull_request` label events, so
+  #    both should use the same git head ref (and not `github.ref`, which may
+  #    be different for PRs).
+  # 2. Our own deploy process may trigger an `unlabeled` event for removing the
+  #    db-restore label, so separate that so that doesn't cause the previous
+  #    deploy that was finishing up to be canceled.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}${{ github.event.action == 'unlabeled' && github.event.label.name == 'deploy-db-restore' && '-removing-ephemeral-label' || '' }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-metadata:
+    name: Deploy Metadata
+    runs-on: self-hosted
+    outputs:
+      staging-perform-deploy: ${{ steps.staging-metadata.outputs.perform-deploy }}
+      staging-perform-undeploy: ${{ steps.staging-metadata.outputs.perform-undeploy }}
+      staging-metadata: ${{ toJSON(steps.staging-metadata.outputs) }}
+      production-perform-deploy: ${{ steps.production-metadata.outputs.perform-deploy }}
+      production-metadata: ${{ toJSON(steps.production-metadata.outputs) }}
+    steps:
+      - name: Import vault secrets
+        id: vault_secrets
+        uses: hashicorp/vault-action@v3
+        with:
+          url: ${{ secrets.VAULT_URL }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          exportEnv: false
+          secrets: |
+            secret/data/reopt-api/ci/deploy container_registry ;
+            secret/data/reopt-api/ci/deploy production_rancher_project_id ;
+            secret/data/reopt-api/ci/deploy staging_rancher_project_id ;
+
+      - name: Staging Metadata
+        id: staging-metadata
+        uses: TADA/deploy-action/metadata@v2
+        with:
+          deploy-env: staging
+          app-name: reopt-api
+          rancher-project-id: ${{ steps.vault_secrets.outputs.staging_rancher_project_id }}
+          registry: ${{ steps.vault_secrets.outputs.container_registry }}
+          branch-url-host-base: ${{ secrets.STAGING_URL_HOST_BASE }}
+          branch-db-name-base: reopt_api_staging
+
+      - name: Production Metadata
+        id: production-metadata
+        uses: TADA/deploy-action/metadata@v2
+        with:
+          deploy-env: production
+          app-name: reopt-api
+          rancher-project-id: ${{ steps.vault_secrets.outputs.production_rancher_project_id }}
+          registry: ${{ steps.vault_secrets.outputs.container_registry }}
+          url-host: ${{ secrets.PRODUCTION_URL_HOST }}
+
+  undeploy-staging:
+    name: Undeploy Staging
+    needs:
+      - deploy-metadata
+    if: ${{ needs.deploy-metadata.outputs.staging-perform-undeploy == 'true' }}
+    uses: TADA/deploy-action/.github/workflows/undeploy-branch.yml@v2
+    with:
+      metadata: ${{ needs.deploy-metadata.outputs.staging-metadata }}
+      vault-kubeconfig-path: secret/data/deploy/staging/on-prem-rancher-test-ponderosa-cluster-test
+      vault-db-superuser-path: secret/data/reopt-db/staging/db-superuser
+    secrets:
+      vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
+      vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
+
+  deploy-staging:
+    name: Deploy Staging
+    needs:
+      - deploy-metadata
+    if: ${{ needs.deploy-metadata.outputs.staging-perform-deploy == 'true' }}
+    uses: TADA/deploy-action/.github/workflows/deploy.yml@v2
+    with:
+      metadata: ${{ needs.deploy-metadata.outputs.staging-metadata }}
+      vault-registry-credentials-path: secret/data/deploy/common/aws-ecr
+      vault-kubeconfig-path: secret/data/deploy/staging/on-prem-rancher-test-ponderosa-cluster-test
+    secrets:
+      vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
+      vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
+
+  deploy-production:
+    name: Deploy Production
+    needs:
+      - deploy-metadata
+      - deploy-staging
+    if: ${{ needs.deploy-metadata.outputs.production-perform-deploy == 'true' }}
+    uses: TADA/deploy-action/.github/workflows/deploy.yml@v2
+    with:
+      metadata: ${{ needs.deploy-metadata.outputs.production-metadata }}
+      vault-registry-credentials-path: secret/data/deploy/common/aws-ecr
+      vault-kubeconfig-path: secret/data/deploy/production/on-prem-rancher-ponderosa-cluster-production
+    secrets:
+      vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
+      vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}

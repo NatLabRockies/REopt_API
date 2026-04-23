@@ -1,0 +1,56 @@
+extends "@tadaSharedKube/KbldConfig.pkl"
+
+import "pkl:json"
+
+local deployMetadata = import("@tadaSharedKube/tadaDeployMetadata.pkl").deployMetadata
+
+local const secretsString = read?("env:DEPLOY_SECRETS")
+local const secrets = new json.Parser {}.parse(secretsString ?? "{}")
+
+// Define the docker images that need to be built and the registries to push
+// them to. For integration with `kbld` during deployments.
+sources {
+  new {
+    image = "reopt-api"
+    path = "."
+    docker {
+      build {
+        file = "Dockerfile"
+        pull = true
+        buildkit = true
+        rawOptions {
+          "--build-arg"
+          "NREL_ROOT_CERT_URL_ROOT=\(secrets.`SECRET_NLR_ROOT_CERT_URL_ROOT`)"
+        }
+      }
+    }
+  }
+
+  new {
+    image = "julia-api"
+    path = "julia_src"
+    docker {
+      build {
+        file = "Dockerfile"
+        pull = true
+        buildkit = true
+        rawOptions {
+          "--build-arg"
+          "NREL_ROOT_CERT_URL_ROOT=\(secrets.`SECRET_NLR_ROOT_CERT_URL_ROOT`)"
+        }
+      }
+    }
+  }
+}
+
+destinations {
+  new {
+    ["image"] = "reopt-api"
+    ["newImage"] = secrets.`SECRET_CONTAINER_REGISTRY`
+  }
+
+  new {
+    ["image"] = "julia-api"
+    ["newImage"] = secrets.`SECRET_CONTAINER_REGISTRY`
+  }
+}
