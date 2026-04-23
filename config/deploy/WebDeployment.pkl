@@ -134,7 +134,7 @@ resources: Listing<K8sResource> = new {
   // deployment.
   local juliaDeployment = new TadaWebDeployment {
     tadaName = "julia"
-    tadaContainerImage = containerImage
+    tadaContainerImage = "julia-api"
     tadaImagePullSecretName = ecrLoginRenewConfigMapResource.imagePullSecretName
 
     tadaResourceLimitCpu = "4000m"
