@@ -10,43 +10,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  vault-secrets:
-    name: Vault Secrets
-    runs-on: self-hosted
-    outputs:
-      container_registry: ${{ steps.vault_secrets.outputs.container_registry }}
-      production_rancher_project_id: ${{ steps.vault_secrets.outputs.production_rancher_project_id }}
-      staging_rancher_project_id: ${{ steps.vault_secrets.outputs.staging_rancher_project_id }}
-    steps:
-      - name: Import vault secrets
-        id: vault_secrets
-        uses: hashicorp/vault-action@v3
-        with:
-          url: ${{ secrets.VAULT_URL }}
-          method: approle
-          roleId: ${{ secrets.VAULT_ROLE_ID }}
-          secretId: ${{ secrets.VAULT_SECRET_ID }}
-          exportEnv: false
-          secrets: |
-            secret/data/reopt-api/ci/deploy container_registry ;
-            secret/data/reopt-api/ci/deploy production_rancher_project_id ;
-            secret/data/reopt-api/ci/deploy staging_rancher_project_id ;
+  vault-nonsensitive-secrets:
+    name: Vault Non-sensitive Secrets
+    uses: TADA/vault-action/.github/workflows/nonsensitive-secrets.yml@nonsensitive
+    with:
+      nonsensitive-secrets: |
+        secret/data/reopt-api/ci/deploy container_registry ;
+        secret/data/reopt-api/ci/deploy production_rancher_project_id ;
+        secret/data/reopt-api/ci/deploy staging_rancher_project_id ;
+    secrets:
+      vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
+      vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
 
   prune-images:
     name: Prune Deploy Images
     uses: TADA/deploy-action/.github/workflows/prune-deploy-images.yml@v2
     needs:
-      - vault-secrets
+      - vault-nonsensitive-secrets
     with:
       vault-registry-credentials-path: secret/data/deploy/common/aws-ecr
-      registry: ${{ needs.vault-secrets.outputs.container_registry }}
+      registry: ${{ fromJSON(needs.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).container_registry }}
       images: |
         tada/reopt-api
       clusters: |
         - vault-kubeconfig-path: secret/data/deploy/staging/on-prem-rancher-test-ponderosa-cluster-test
-          rancher-project-id: ${{ needs.vault-secrets.outputs.staging_rancher_project_id }}
+          rancher-project-id: ${{ fromJSON(needs.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).staging_rancher_project_id }}
         - vault-kubeconfig-path: secret/data/deploy/production/on-prem-rancher-ponderosa-cluster-production
-          rancher-project-id: ${{ needs.vault-secrets.outputs.production_rancher_project_id }}
+          rancher-project-id: ${{ fromJSON(needs.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).production_rancher_project_id }}
     secrets:
       vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
       vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
