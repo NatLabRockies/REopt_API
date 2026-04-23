@@ -97,11 +97,11 @@ resources: Listing<K8sResource> = new {
     tadaImagePullSecretName = ecrLoginRenewConfigMapResource.imagePullSecretName
 
     tadaResourceLimitCpu = "2000m"
-    tadaResourceLimitMemory = 2000.mib
 
     when (deployMetadata.`deploy-env` == "production") {
       tadaReplicaCount = 10
       tadaResourceRequestCpu = "1000m"
+      tadaResourceLimitMemory = 2000.mib
       tadaResourceRequestMemory = 2000.mib
     } else {
       tadaResourceRequestCpu = "500m"
