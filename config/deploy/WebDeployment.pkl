@@ -362,26 +362,24 @@ resources: Listing<K8sResource> = new {
     tadaServiceName = djangoService.metadata.name
     tadaServicePort = 8000
 
-    // Configure the ingress on `main` to listen on the old `*.nrel.gov`
-    // domains (in addition to the new `nlr.gov` domains). We can remove this
-    // once the nrel.gov domain is fully gone.
-    when (deployMetadata.`deploy-env` == "production" || (deployMetadata.`deploy-env` == "staging" && deployMetadata.`branch-is-primary` == "true")) {
-      local nrelHost = deployMetadata.`url-host`.replaceLast(".nlr.gov", ".nrel.gov")
-      spec {
-        rules {
-          new {
-            host = nrelHost!!
-            http {
-              paths {
-                new {
-                  path = "/"
-                  pathType = "Prefix"
-                  backend {
-                    service {
-                      name = djangoService.metadata.name
-                      port {
-                        number = 8000
-                      }
+    // Configure the ingress to listen on the old `*.nrel.gov` domains (in
+    // addition to the new `nlr.gov` domains). We can remove this once the
+    // nrel.gov domain is fully gone.
+    local nrelHost = deployMetadata.`url-host`.replaceLast(".nlr.gov", ".nrel.gov")
+    spec {
+      rules {
+        new {
+          host = nrelHost!!
+          http {
+            paths {
+              new {
+                path = "/"
+                pathType = "Prefix"
+                backend {
+                  service {
+                    name = djangoService.metadata.name
+                    port {
+                      number = 8000
                     }
                   }
                 }

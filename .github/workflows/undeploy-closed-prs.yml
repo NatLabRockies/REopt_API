@@ -24,6 +24,7 @@ jobs:
             {{ with (datasource "vault" "reopt-api/ci/deploy").data }}
               {{ $secrets = coll.Merge (coll.Dict
                 "staging_rancher_project_id" .staging_rancher_project_id
+                "staging_url_host_base" .staging_url_host_base
               ) $secrets }}
             {{ end }}
           vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
@@ -36,7 +37,7 @@ jobs:
           deploy-env: staging
           app-name: reopt-api
           rancher-project-id: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).staging_rancher_project_id }}
-          branch-url-host-base: ${{ secrets.STAGING_URL_HOST_BASE }}
+          branch-url-host-base: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).staging_url_host_base }}
           branch-db-name-base: reopt_api_staging
 
   undeploy-staging:

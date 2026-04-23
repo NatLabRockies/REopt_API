@@ -42,7 +42,9 @@ jobs:
               {{ $secrets = coll.Merge (coll.Dict
                 "container_registry" .container_registry
                 "production_rancher_project_id" .production_rancher_project_id
+                "production_url_host" .production_url_host
                 "staging_rancher_project_id" .staging_rancher_project_id
+                "staging_url_host_base" .staging_url_host_base
               ) $secrets }}
             {{ end }}
           vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
@@ -56,7 +58,7 @@ jobs:
           app-name: reopt-api
           rancher-project-id: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).staging_rancher_project_id }}
           registry: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).container_registry }}
-          branch-url-host-base: ${{ secrets.STAGING_URL_HOST_BASE }}
+          branch-url-host-base: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).staging_url_host_base }}
           branch-db-name-base: reopt_api_staging
 
       - name: Production Metadata
@@ -67,7 +69,7 @@ jobs:
           app-name: reopt-api
           rancher-project-id: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).production_rancher_project_id }}
           registry: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).container_registry }}
-          url-host: ${{ secrets.PRODUCTION_URL_HOST }}
+          branch-url-host-base: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).production_url_host }}
 
   undeploy-staging:
     name: Undeploy Staging
