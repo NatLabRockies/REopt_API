@@ -2,8 +2,9 @@ apiVersion: vendir.k14s.io/v1alpha1
 directories:
 - contents:
   - git:
-      commitTitle: Allow for easier customization of service and ingress name.
-      sha: 2ad60887c5a5c3f6766a43cb394cb890a50b43f1
+      commitTitle: Make ingress match service name by default when custom name is
+        defined
+      sha: 033995789e8e137b581d26040acd0934b193ffbb
     path: tada-shared-kube
   path: external
 kind: LockConfig

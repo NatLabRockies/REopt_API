@@ -340,26 +340,23 @@ resources: Listing<K8sResource> = new {
 
   local djangoService = new TadaWebService {
     tadaName = "django"
-    tadaAppLabel = "django"
     tadaPort = 8000
   }
   djangoService
 
   local juliaService = new TadaWebService {
     tadaName = "julia"
-    tadaAppLabel = "julia"
     tadaPort = 8081
   }
   juliaService
 
   new TadaWebService {
     tadaName = "redis"
-    tadaAppLabel = "redis"
     tadaPort = 6379
   }
 
   new TadaWebIngress {
-    tadaServiceName = djangoService.metadata.name
+    tadaName = "django"
     tadaServicePort = 8000
 
     // Configure the ingress to listen on the old `*.nrel.gov` domains (in
