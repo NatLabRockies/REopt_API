@@ -46,11 +46,11 @@ sources {
 destinations {
   new {
     ["image"] = "reopt-api"
-    ["newImage"] = secrets.`SECRET_CONTAINER_REGISTRY`
+    ["newImage"] = "\(secrets.`SECRET_CONTAINER_REGISTRY`)/tada/reopt-api"
   }
 
   new {
     ["image"] = "julia-api"
-    ["newImage"] = secrets.`SECRET_CONTAINER_REGISTRY`
+    ["newImage"] = "\(secrets.`SECRET_CONTAINER_REGISTRY`)/tada/reopt-api"
   }
 }
