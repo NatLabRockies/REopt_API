@@ -6,4 +6,4 @@ directories:
       - path: tada-shared-kube
         git:
           url: https://github.nrel.gov/TADA/tada-shared-kube.git
-          ref: origin/ports
+          ref: origin/v2

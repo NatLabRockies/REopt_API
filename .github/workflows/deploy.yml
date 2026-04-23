@@ -35,7 +35,7 @@ jobs:
     steps:
       - name: Import vault nonsensitive secrets
         id: vault-nonsensitive-secrets
-        uses: TADA/vault-action/nonsensitive-secrets@nonsensitive
+        uses: TADA/vault-action/nonsensitive-secrets@v1
         with:
           template: |
             {{ with (datasource "vault" "reopt-api/ci/deploy").data }}
