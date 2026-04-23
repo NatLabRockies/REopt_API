@@ -48,8 +48,8 @@ resources: Listing<K8sResource> = new {
     data {
       ["APP_ENV"] = deployMetadata.`deploy-env`
       ["BRANCH_NAME"] = deployMetadata.`branch-name`
-      ["JULIA_HOST"] = "julia-service.svc.cluster.local"
-      ["REDIS_HOST"] = "redis-service.svc.cluster.local"
+      ["JULIA_HOST"] = "julia-service.\(deployMetadata.`app-namespace`).svc.cluster.local"
+      ["REDIS_HOST"] = "redis-service.\(deployMetadata.`app-namespace`).svc.cluster.local"
       ["K8S_DEPLOY"] = "true"
 
       when (deployMetadata.`branch-is-primary` == "false") {
