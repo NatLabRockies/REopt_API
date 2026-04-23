@@ -105,8 +105,8 @@ resources: Listing<K8sResource> = new {
       tadaResourceRequestMemory = 2000.mib
     } else {
       tadaResourceRequestCpu = "500m"
-      tadaResourceRequestMemory = 700.mib
-      tadaResourceLimitMemory = 700.mib
+      tadaResourceRequestMemory = 800.mib
+      tadaResourceLimitMemory = 1000.mib
     }
 
     tadaContainerPort = 8000
