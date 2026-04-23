@@ -11,16 +11,25 @@ concurrency:
 
 jobs:
   vault-nonsensitive-secrets:
-    name: Vault Non-sensitive Secrets
-    uses: TADA/vault-action/.github/workflows/nonsensitive-secrets.yml@nonsensitive
-    with:
-      nonsensitive-secrets: |
-        secret/data/reopt-api/ci/deploy container_registry ;
-        secret/data/reopt-api/ci/deploy production_rancher_project_id ;
-        secret/data/reopt-api/ci/deploy staging_rancher_project_id ;
-    secrets:
-      vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
-      vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
+    name: Vault Non-Sensitive Secrets
+    runs-on: self-hosted
+    outputs:
+      nonsensitive-secrets: ${{ steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets }}
+    steps:
+      - name: Import vault nonsensitive secrets
+        id: vault-nonsensitive-secrets
+        uses: TADA/vault-action/nonsensitive-secrets@nonsensitive
+        with:
+          template: |
+            {{ with (datasource "vault" "reopt-api/ci/deploy").data }}
+              {{ $secrets = coll.Merge (coll.Dict
+                "container_registry" .container_registry
+                "production_rancher_project_id" .production_rancher_project_id
+                "staging_rancher_project_id" .staging_rancher_project_id
+              ) $secrets }}
+            {{ end }}
+          vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
+          vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
 
   prune-images:
     name: Prune Deploy Images
