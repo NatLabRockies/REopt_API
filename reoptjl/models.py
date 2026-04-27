@@ -4625,14 +4625,20 @@ class CHPInputs(BaseModel, models.Model):
     months_serving_absorption_chiller_only = ArrayField(
         models.IntegerField(
             validators=[
-                MinValueValidator(1),
-                MaxValueValidator(12)
+                MinValueValidator(0),
+                MaxValueValidator(1)
             ],
             null=True, blank=True
         ),
         default=list, blank=True,
         help_text="Months of the year in which the CHP only serves the absorption chiller load, only used if serve_absorption_chiller_only is True"
     )
+    include_cooling_in_chp_size = models.BooleanField(
+        default=False,
+        null=True,
+        blank=True,
+        help_text="Boolean indicator if cooling load (via absorption chiller) is included in the heuristic CHP sizing calculation along with heating loads"   
+    )    
     follow_electrical_load = models.BooleanField(
         default=False,
         null=True, 
