@@ -4625,8 +4625,8 @@ class CHPInputs(BaseModel, models.Model):
     months_serving_absorption_chiller_only = ArrayField(
         models.IntegerField(
             validators=[
-                MinValueValidator(0),
-                MaxValueValidator(1)
+                MinValueValidator(1),
+                MaxValueValidator(12)
             ],
             null=True, blank=True
         ),
