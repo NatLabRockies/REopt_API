@@ -948,11 +948,9 @@ version = "1.11.0"
 
 [[deps.REopt]]
 deps = ["ArchGDAL", "CSV", "CoolProp", "DataFrames", "Dates", "DelimitedFiles", "HTTP", "JLD", "JSON", "JuMP", "LinDistFlow", "LinearAlgebra", "Logging", "MathOptInterface", "Requires", "Roots", "Statistics", "TestEnv"]
-git-tree-sha1 = "1ea13e5610eb833ef1b62352fa28acf3bc7e41c4"
-repo-rev = "existing-chiller-debug"
-repo-url = "https://github.com/NatLabRockies/REopt.jl.git"
+git-tree-sha1 = "b6f5e032280be116d94ed3cfb906f014a5ffefdb"
 uuid = "d36ad4e8-d74a-4f7a-ace1-eaea049febf6"
-version = "0.58.0"
+version = "0.58.2"
 
 [[deps.Random]]
 deps = ["SHA"]
