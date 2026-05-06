@@ -7137,7 +7137,7 @@ class HotThermalStorageInputs(BaseModel, models.Model):
         help_text="Battery state of charge at first hour of optimization as fraction of energy capacity."
     )
     installed_cost_per_gal = models.FloatField(
-        default=1.5,
+        default=1.9,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0e4)
@@ -7575,7 +7575,7 @@ class ColdThermalStorageInputs(BaseModel, models.Model):
         help_text="Battery state of charge at first hour of optimization as fraction of energy capacity."
     )
     installed_cost_per_gal = models.FloatField(
-        default=1.5,
+        default=1.9,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0e4)
