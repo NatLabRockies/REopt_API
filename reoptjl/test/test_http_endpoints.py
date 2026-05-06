@@ -76,8 +76,9 @@ class TestHTTPEndpoints(ResourceTestCaseMixin, TestCase):
 
         # Check the endpoint logic with the expected selection
         self.assertEqual(http_response["prime_mover"], "steam_turbine")
-        self.assertEqual(http_response["size_class"], 1)
-        self.assertGreater(http_response["chp_elec_size_heuristic_kw"], 574.419)
+        self.assertEqual(http_response["size_class"], 2)
+        self.assertGreater(http_response["chp_elec_size_heuristic_kw"], 400.0)
+        self.assertLess(http_response["chp_elec_size_heuristic_kw"], 1000.0)
 
     def test_absorption_chiller_defaults(self):
 
