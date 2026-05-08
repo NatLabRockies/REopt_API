@@ -12,7 +12,8 @@ class TestHTTPEndpoints(ResourceTestCaseMixin, TestCase):
     def test_chp_defaults(self):
 
         inputs = {"hot_water_or_steam": "hot_water",
-                "avg_boiler_fuel_load_mmbtu_per_hour": 28.0
+                "avg_boiler_fuel_load_mmbtu_per_hour": 28.0,
+                "include_cooling_in_size": False
         }
 
         # Direct call of the http.jl endpoint /chp_defaults
