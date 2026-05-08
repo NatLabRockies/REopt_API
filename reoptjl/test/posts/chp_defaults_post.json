@@ -13,6 +13,9 @@
   "DomesticHotWaterLoad": {
     "doe_reference_name": "Hospital"
   },
+  "CoolingLoad": {
+    "doe_reference_name": "Hospital"
+  },
   "ElectricTariff": {
     "blended_annual_energy_rate": 0.1,
     "blended_annual_demand_rate": 10
@@ -26,8 +29,15 @@
     "min_allowable_kw": 0.0,
     "max_kw": 200.0,
     "fuel_cost_per_mmbtu": 10.0,
-    "om_cost_per_kwh": 0.0246
+    "om_cost_per_kwh": 0.0246,
+    "absorption_chiller_cop":0.7,
+    "include_cooling_in_size": false
     },
+  "AbsorptionChiller":{
+    "cop": 3.4,
+    "max_thermal_factor_on_peak_load": 1.25
+    },
+  "ExistingChiller":{},
   "PV": {
     "min_kw": 0,
     "max_kw": 0
