@@ -350,7 +350,7 @@ function chp_defaults(req::HTTP.Request)
                 ]
     int_vals = ["size_class"]
     bool_vals = ["is_electric_only",
-                "include_cooling_in_size"
+                "include_cooling_in_chp_size"
                 ]
     all_vals = vcat(string_vals, float_vals, int_vals, bool_vals)
     # Process .json inputs and convert to correct type if needed

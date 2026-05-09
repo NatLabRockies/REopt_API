@@ -31,7 +31,7 @@
     "fuel_cost_per_mmbtu": 10.0,
     "om_cost_per_kwh": 0.0246,
     "absorption_chiller_cop":0.7,
-    "include_cooling_in_size": false
+    "include_cooling_in_chp_size": false
     },
   "AbsorptionChiller":{
     "cop": 3.4,
