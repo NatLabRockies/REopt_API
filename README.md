@@ -1,6 +1,6 @@
 REopt® API
 =========
-The REopt® model in this repository is a free, open-source, development version of the [REopt API](https://developer.nlr.gov/docs/energy-optimization/reopt/). A production version of the REopt API lies behind the [REopt Web Tool](https://reopt.nrel.gov/tool).
+The REopt® model in this repository is a free, open-source, development version of the [REopt API](https://developer.nlr.gov/docs/energy-optimization/reopt/). A production version of the REopt API lies behind the [REopt Web Tool](https://reopt.nlr.gov/tool).
 
 The REopt API provides concurrent, multiple technology integration and optimization capabilities to help organizations meet their cost savings, energy performance, resilience, and emissions reduction goals. Formulated as a mixed integer linear program, the REopt model recommends an optimally sized mix of renewable energy, conventional generation, and energy storage technologies; estimates the net present value of implementing those technologies; and provides a dispatch strategy for operating the technology mix at maximum economic efficiency. A list of the REopt model capabilities is provided [here](https://reopt.nlr.gov/about/capabilities.html). Example projects using REopt can be viewed [here](https://reopt.nlr.gov/projects/).
 
