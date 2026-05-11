@@ -948,8 +948,8 @@ version = "1.11.0"
 
 [[deps.REopt]]
 deps = ["ArchGDAL", "CSV", "CoolProp", "DataFrames", "Dates", "DelimitedFiles", "HTTP", "JLD", "JSON", "JuMP", "LinDistFlow", "LinearAlgebra", "Logging", "MathOptInterface", "Requires", "Roots", "Statistics", "TestEnv"]
-git-tree-sha1 = "66e8b64dcb699482d514730ba0820e39be4d254b"
-repo-rev = "rename-chp-defaults-args"
+git-tree-sha1 = "6ec75809973b9a0632e32761e971b4fe7ed67a9c"
+repo-rev = "develop"
 repo-url = "https://github.com/NatLabRockies/REopt.jl.git"
 uuid = "d36ad4e8-d74a-4f7a-ace1-eaea049febf6"
 version = "0.59.0"
