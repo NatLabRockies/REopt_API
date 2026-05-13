@@ -453,6 +453,9 @@ def chp_defaults(request):
     if request.GET.get("thermal_efficiency"):
         inputs["thermal_efficiency"] = request.GET.get("thermal_efficiency")  # Conversion to correct type happens in http.jl
 
+    if inputs["avg_cooling_load_kw"] and not inputs["include_cooling_in_chp_size"]:
+        inputs["include_cooling_in_chp_size"] = True
+
     try:
         julia_host = os.environ.get('JULIA_HOST', "julia")
         http_jl_response = requests.get("http://" + julia_host + ":8081/chp_defaults/", json=inputs)
