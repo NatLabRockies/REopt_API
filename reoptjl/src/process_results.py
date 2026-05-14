@@ -190,7 +190,7 @@ def update_inputs_in_database(inputs_to_update: dict, run_uuid: str) -> None:
                                                                         tb.format_tb(exc_traceback)
                                                                     )
         log.error(debug_msg)
-        raise e
+        return
 
 def prune_update_fields(model_obj, dict_to_update):
     """
