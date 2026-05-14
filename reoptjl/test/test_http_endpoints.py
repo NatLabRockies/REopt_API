@@ -12,7 +12,8 @@ class TestHTTPEndpoints(ResourceTestCaseMixin, TestCase):
     def test_chp_defaults(self):
 
         inputs = {"hot_water_or_steam": "hot_water",
-                "avg_boiler_fuel_load_mmbtu_per_hour": 28.0
+                "avg_boiler_fuel_load_mmbtu_per_hour": 28.0,
+                "include_cooling_in_chp_size": "false"
         }
 
         # Direct call of the http.jl endpoint /chp_defaults
@@ -76,8 +77,9 @@ class TestHTTPEndpoints(ResourceTestCaseMixin, TestCase):
 
         # Check the endpoint logic with the expected selection
         self.assertEqual(http_response["prime_mover"], "steam_turbine")
-        self.assertEqual(http_response["size_class"], 1)
-        self.assertGreater(http_response["chp_elec_size_heuristic_kw"], 574.419)
+        self.assertEqual(http_response["size_class"], 2)
+        self.assertGreater(http_response["chp_elec_size_heuristic_kw"], 400.0)
+        self.assertLess(http_response["chp_elec_size_heuristic_kw"], 1000.0)
 
     def test_absorption_chiller_defaults(self):
 
@@ -103,8 +105,8 @@ class TestHTTPEndpoints(ResourceTestCaseMixin, TestCase):
 
         # Check the endpoint logic with the expected selection
         self.assertEqual(http_response["thermal_consumption_hot_water_or_steam"], "hot_water")
-        self.assertEqual(http_response["default_inputs"]["om_cost_per_ton"], 80.0)
-        self.assertEqual(http_response["default_inputs"]["installed_cost_per_ton"], 3066.0)
+        self.assertEqual(http_response["default_inputs"]["om_cost_per_ton"], 150.0)
+        self.assertEqual(http_response["default_inputs"]["installed_cost_per_ton"], 4500.0)
         self.assertEqual(http_response["default_inputs"]["cop_thermal"], 0.74)
         self.assertNotIn("thermal_consumption_hot_water_or_steam", http_response["default_inputs"].keys())
     

@@ -344,9 +344,14 @@ function chp_defaults(req::HTTP.Request)
                 "boiler_efficiency",
                 "avg_electric_load_kw",
                 "max_electric_load_kw",
-                "thermal_efficiency"]
+                "thermal_efficiency",
+                "avg_cooling_load_kw",
+                "absorption_chiller_cop"
+                ]
     int_vals = ["size_class"]
-    bool_vals = ["is_electric_only"]
+    bool_vals = ["is_electric_only",
+                "include_cooling_in_chp_size"
+                ]
     all_vals = vcat(string_vals, float_vals, int_vals, bool_vals)
     # Process .json inputs and convert to correct type if needed
     for k in all_vals
