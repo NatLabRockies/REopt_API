@@ -453,7 +453,7 @@ def chp_defaults(request):
     if request.GET.get("thermal_efficiency"):
         inputs["thermal_efficiency"] = request.GET.get("thermal_efficiency")  # Conversion to correct type happens in http.jl
 
-    if inputs["avg_cooling_load_kw"] and not inputs["include_cooling_in_chp_size"]:
+    if inputs["avg_cooling_load_kw"] and inputs["include_cooling_in_chp_size"] is None:
         inputs["include_cooling_in_chp_size"] = True
 
     try:
