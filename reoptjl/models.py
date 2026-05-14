@@ -7262,10 +7262,12 @@ class HotThermalStorageOutputs(BaseModel, models.Model):
         models.FloatField(null=True, blank=True),
         default = list
     )
+
     storage_to_steamturbine_series_mmbtu_per_hour = ArrayField(
         models.FloatField(null=True, blank=True),
         default = list
     )
+
     storage_to_absorption_chiller_series_mmbtu_per_hour = ArrayField(
         models.FloatField(null=True, blank=True),
         default = list
@@ -7482,18 +7484,22 @@ class HighTempThermalStorageOutputs(BaseModel, models.Model):
         primary_key=True
     )
     size_kwh = models.FloatField(null=True, blank=True)
+    
     soc_series_fraction = ArrayField(
         models.FloatField(null=True, blank=True),
         default = list,
     )
+
     storage_to_load_series_mmbtu_per_hour = ArrayField(
         models.FloatField(null=True, blank=True),
         default = list,
     )
+
     storage_to_steamturbine_series_mmbtu_per_hour = ArrayField(
         models.FloatField(null=True, blank=True),
         default = list
     )
+
     storage_to_absorption_chiller_series_mmbtu_per_hour = ArrayField(
         models.FloatField(null=True, blank=True),
         default = list
