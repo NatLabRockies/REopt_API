@@ -436,7 +436,7 @@ def peak_load_outage_times(request):
 def chp_defaults(request):
     include_cooling_in_chp_size = request.GET.get("include_cooling_in_chp_size")
     if isinstance(include_cooling_in_chp_size, str):
-        include_cooling_in_chp_size_lower = include_cooling_in_chp_size.lower()
+        include_cooling_in_chp_size_lower = include_cooling_in_chp_size.strip().lower()
         if include_cooling_in_chp_size_lower == "true":
             include_cooling_in_chp_size = True
         elif include_cooling_in_chp_size_lower == "false":
