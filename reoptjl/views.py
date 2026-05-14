@@ -434,6 +434,14 @@ def peak_load_outage_times(request):
         return JsonResponse({"Error": "Unexpected error in outage_times_based_on_load_peaks endpoint. Check log for more."}, status=500)
     
 def chp_defaults(request):
+    include_cooling_in_chp_size = request.GET.get("include_cooling_in_chp_size")
+    if isinstance(include_cooling_in_chp_size, str):
+        include_cooling_in_chp_size_lower = include_cooling_in_chp_size.lower()
+        if include_cooling_in_chp_size_lower == "true":
+            include_cooling_in_chp_size = True
+        elif include_cooling_in_chp_size_lower == "false":
+            include_cooling_in_chp_size = False
+
     inputs = {
         "hot_water_or_steam": request.GET.get("hot_water_or_steam"),
         "avg_boiler_fuel_load_mmbtu_per_hour": request.GET.get("avg_boiler_fuel_load_mmbtu_per_hour"),
@@ -444,7 +452,7 @@ def chp_defaults(request):
         "is_electric_only": request.GET.get("is_electric_only"),
         "avg_cooling_load_kw": request.GET.get("avg_cooling_load_kw"),
         "absorption_chiller_cop": request.GET.get("absorption_chiller_cop"),
-        "include_cooling_in_chp_size": request.GET.get("include_cooling_in_chp_size")
+        "include_cooling_in_chp_size": include_cooling_in_chp_size
     }
 
     if request.GET.get("size_class"):
