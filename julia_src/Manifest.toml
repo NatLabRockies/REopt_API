@@ -948,7 +948,7 @@ version = "1.11.0"
 
 [[deps.REopt]]
 deps = ["ArchGDAL", "CSV", "CoolProp", "DataFrames", "Dates", "DelimitedFiles", "HTTP", "JLD", "JSON", "JuMP", "LinDistFlow", "LinearAlgebra", "Logging", "MathOptInterface", "Requires", "Roots", "Statistics", "TestEnv"]
-git-tree-sha1 = "0f1b18ed08ae2028ed5ce6aa8cfe4c32fb9df323"
+git-tree-sha1 = "14a9099ef119c63a54d759796d2c4c3da3fbfb95"
 repo-rev = "chp-heuristic-validation"
 repo-url = "https://github.com/NatLabRockies/REopt.jl.git"
 uuid = "d36ad4e8-d74a-4f7a-ace1-eaea049febf6"
