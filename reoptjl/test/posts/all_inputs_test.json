@@ -187,7 +187,9 @@
         "total_itc_fraction": 0.0,
         "total_rebate_per_kw": 0.0,
         "total_rebate_per_kwh": 0.0,
-        "optimize_soc_init_fraction": false
+        "optimize_soc_init_fraction": false,
+        "fixed_soc_series_fraction": [],
+        "fixed_soc_series_fraction_tolerance": 0.05
     },
     "Generator": {
         "existing_kw": 0.0,
