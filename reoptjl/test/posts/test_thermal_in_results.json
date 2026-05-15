@@ -60,7 +60,11 @@
         "min_turn_down_fraction": 0.1,
         "thermal_efficiency_full_load": 0.45,
         "thermal_efficiency_half_load": 0.45,
-        "cooling_thermal_factor": 0.8
+        "cooling_thermal_factor": 0.8,
+        "follow_electrical_load": false,
+        "serve_absorption_chiller_only":false,
+        "months_serving_absorption_chiller_only":[],
+        "include_cooling_in_chp_size":false
     },
     "HotThermalStorage": {
         "min_gal": 2500,
