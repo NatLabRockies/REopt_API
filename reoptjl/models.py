@@ -4616,6 +4616,35 @@ class CHPInputs(BaseModel, models.Model):
         blank=True,
         help_text="Boolean indicator if CHP can supply steam to the steam turbine for electric production"   
     )
+    serve_absorption_chiller_only = models.BooleanField(
+        default=False,
+        null=True, 
+        blank=True,
+        help_text="Boolean indicator if CHP produced heat either serves absorption chiller or sends it to waste"   
+    )
+    months_serving_absorption_chiller_only = ArrayField(
+        models.IntegerField(
+            validators=[
+                MinValueValidator(1),
+                MaxValueValidator(12)
+            ],
+            null=True, blank=True
+        ),
+        default=list, blank=True,
+        help_text="Months of the year in which the CHP only serves the absorption chiller load, only used if serve_absorption_chiller_only is True"
+    )
+    include_cooling_in_chp_size = models.BooleanField(
+        default=False,
+        null=True,
+        blank=True,
+        help_text="Boolean indicator if cooling load (via absorption chiller) is included in the heuristic CHP sizing calculation along with heating loads"   
+    )    
+    follow_electrical_load = models.BooleanField(
+        default=False,
+        null=True, 
+        blank=True,
+        help_text="Boolean indicator if CHP follows the electrical load by running at capacity or meeting the load only"   
+    )
     can_serve_dhw = models.BooleanField(
         default=True,
         null=True, 
@@ -4966,6 +4995,13 @@ class CHPOutputs(BaseModel, models.Model):
         ),
         default=list, blank=True,
         help_text="Thermal power to steam turbine time-series array [MMBtu/hr]"
+    )    
+    thermal_to_absorption_chiller_series_mmbtu_per_hour = ArrayField(
+        models.FloatField(
+            null=True, blank=True
+        ),
+        default=list,
+        help_text="Thermal power to absorption chiller time-series array [MMBtu/hr]"
     )    
     year_one_fuel_cost_before_tax = models.FloatField(
         null=True, blank=True,
@@ -5637,6 +5673,11 @@ class ExistingBoilerOutputs(BaseModel, models.Model):
         default = list,
     )
 
+    thermal_to_absorption_chiller_series_mmbtu_per_hour = ArrayField(
+        models.FloatField(null=True, blank=True),
+        default = list
+    )
+
     thermal_to_dhw_load_series_mmbtu_per_hour = ArrayField(
         models.FloatField(null=True, blank=True),
         default = list
@@ -5806,6 +5847,11 @@ class ElectricHeaterOutputs(BaseModel, models.Model):
     thermal_to_load_series_mmbtu_per_hour = ArrayField(
         models.FloatField(null=True, blank=True),
         default = list,
+    )
+
+    thermal_to_absorption_chiller_series_mmbtu_per_hour = ArrayField(
+        models.FloatField(null=True, blank=True),
+        default = list
     )
 
     thermal_to_dhw_load_series_mmbtu_per_hour = ArrayField(
@@ -6623,6 +6669,11 @@ class BoilerOutputs(BaseModel, models.Model):
         models.FloatField(null=True, blank=True),
         default = list,
     )
+    
+    thermal_to_absorption_chiller_series_mmbtu_per_hour = ArrayField(
+        models.FloatField(null=True, blank=True),
+        default = list
+    )
 
     size_mmbtu_per_hour = models.FloatField(null=True, blank=True)
 
@@ -6985,6 +7036,11 @@ class SteamTurbineOutputs(BaseModel, models.Model):
         models.FloatField(null=True, blank=True),
         default = list,
     )
+    
+    thermal_to_absorption_chiller_series_mmbtu_per_hour = ArrayField(
+        models.FloatField(null=True, blank=True),
+        default = list
+    )
 
     thermal_to_dhw_load_series_mmbtu_per_hour = ArrayField(
         models.FloatField(null=True, blank=True),
@@ -7081,7 +7137,7 @@ class HotThermalStorageInputs(BaseModel, models.Model):
         help_text="Battery state of charge at first hour of optimization as fraction of energy capacity."
     )
     installed_cost_per_gal = models.FloatField(
-        default=1.5,
+        default=1.9,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0e4)
@@ -7206,7 +7262,13 @@ class HotThermalStorageOutputs(BaseModel, models.Model):
         models.FloatField(null=True, blank=True),
         default = list
     )
-    storage_to_turbine_series_mmbtu_per_hour = ArrayField(
+
+    storage_to_steamturbine_series_mmbtu_per_hour = ArrayField(
+        models.FloatField(null=True, blank=True),
+        default = list
+    )
+
+    storage_to_absorption_chiller_series_mmbtu_per_hour = ArrayField(
         models.FloatField(null=True, blank=True),
         default = list
     )
@@ -7422,15 +7484,23 @@ class HighTempThermalStorageOutputs(BaseModel, models.Model):
         primary_key=True
     )
     size_kwh = models.FloatField(null=True, blank=True)
+    
     soc_series_fraction = ArrayField(
         models.FloatField(null=True, blank=True),
         default = list,
     )
+
     storage_to_load_series_mmbtu_per_hour = ArrayField(
         models.FloatField(null=True, blank=True),
         default = list,
     )
-    storage_to_turbine_series_mmbtu_per_hour = ArrayField(
+
+    storage_to_steamturbine_series_mmbtu_per_hour = ArrayField(
+        models.FloatField(null=True, blank=True),
+        default = list
+    )
+
+    storage_to_absorption_chiller_series_mmbtu_per_hour = ArrayField(
         models.FloatField(null=True, blank=True),
         default = list
     )
@@ -7511,7 +7581,7 @@ class ColdThermalStorageInputs(BaseModel, models.Model):
         help_text="Battery state of charge at first hour of optimization as fraction of energy capacity."
     )
     installed_cost_per_gal = models.FloatField(
-        default=1.5,
+        default=1.9,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0e4)
@@ -9019,6 +9089,7 @@ class GHPOutputs(BaseModel, models.Model):
     ghx_residual_value_present_value = models.FloatField(null=True, blank=True)
     thermal_to_space_heating_load_series_mmbtu_per_hour = ArrayField(models.FloatField(null=True, blank=True), default=list, null=True, blank=True)
     thermal_to_dhw_load_series_mmbtu_per_hour = ArrayField(models.FloatField(null=True, blank=True), default=list, null=True, blank=True)
+    thermal_to_load_series_mmbtu_per_hour = ArrayField(models.FloatField(null=True, blank=True), default=list, null=True, blank=True)
     thermal_to_load_series_ton = ArrayField(models.FloatField(null=True, blank=True), default=list, null=True, blank=True)
     avoided_capex_by_ghp_present_value = models.FloatField(null=True, blank=True) 
     annual_thermal_production_mmbtu = models.FloatField(null=True, blank=True)
@@ -9252,6 +9323,10 @@ class CSTOutputs(BaseModel, models.Model):
     thermal_to_load_series_mmbtu_per_hour = ArrayField(
         models.FloatField(null=True, blank=True),
         default=list, blank=True
+    )    
+    thermal_to_absorption_chiller_series_mmbtu_per_hour = ArrayField(
+        models.FloatField(null=True, blank=True),
+        default = list
     )
     thermal_to_dhw_load_series_mmbtu_per_hour = ArrayField(
         models.FloatField(null=True, blank=True),
