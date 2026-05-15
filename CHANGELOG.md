@@ -26,10 +26,16 @@ Classify the change according to the following categories:
     ##### Removed
     ### Patches
 
+## fixed-soc
+### Minor udpates
+#### Added
+- Add **ElectricStorage** inputs field **fixed_soc_series_fraction** and  **fixed_soc_series_fraction_tolerance** to allow users to fix the SOC timeseries within a chosen absolute tolerance
+### Changed
+- **ElectricStorage** result key **state_of_health** to **state_of_health_series_fraction**
 
 ## Develop - 2026-05-14
 ### Minor updates
-##### Added 
+#### Added 
 - New `CHP` fields **serve_absorption_chiller_only**, **months_serving_absorption_chiller_only**, **follow_electrical_load**, and **include_cooling_in_chp_size**
 - New output `thermal_to_absorption_chiller_series_mmbtu_per_hour` added to heating technologies `CHPOutputs`, `ElectricHeaterOutputs`, `CSTOutputs`, `BoilerOutputs`, `SteamTurbineOutputs`, and `ExistingBoilerOutputs`, and new output `storage_to_absorption_chiller_series_mmbtu_per_hour` for `HotThermalStorageOutputs` and `HighTempThermalStorageOutputs`.  
 ### Changed
@@ -39,8 +45,6 @@ Classify the change according to the following categories:
 ### Fixed
 - Fixed a bug in which the CHP system requires a **DomesticHotWater** load.
 - Fixed a bug in which the storage to steam turbine flow was included in the thermal heating load served.
-
-
 
 ## v3.18.0
 ### Minor Updates
