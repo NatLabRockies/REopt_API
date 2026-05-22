@@ -1,4 +1,4 @@
-# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NREL/REopt_API/blob/master/LICENSE.
+# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NatLabRockies/REopt_API/blob/master/LICENSE.
 import math
 from django.db import models
 from django.db.models.fields import NOT_PROVIDED
@@ -170,7 +170,7 @@ class APIMeta(BaseModel, models.Model):
                    "one REopt API Scenario is created).")
     )
     job_type = models.TextField(
-        default='developer.nrel.gov'
+        default='developer.nlr.gov'
     )
     status = models.TextField(blank=True)
     created = models.DateTimeField(auto_now_add=True)
@@ -183,7 +183,7 @@ class APIMeta(BaseModel, models.Model):
     api_key = models.TextField(
         blank=True,
         default="",
-        help_text="NREL Developer API key of the user"
+        help_text="NLR Developer API key of the user"
     )
     portfolio_uuid = models.TextField(
         blank=True,

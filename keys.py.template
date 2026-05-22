@@ -1,7 +1,7 @@
 
 rollbar_access_token = 'test'
 
-#get your individual key from here: https://developer.nrel.gov/docs/api-key/ and replace the DEMO_KEY with that
+#get your individual key from here: https://developer.nlr.gov/docs/api-key/ and replace the DEMO_KEY with that
 pvwatts_api_key = 'DEMO_KEY'
 developer_nrel_gov_key = 'DEMO_KEY'
 
@@ -15,7 +15,7 @@ dev_user_password = 'reopt'
 dev_redis_host = 'localhost'
 dev_redis_password = 'password'
 
-# items that don't have to be changed by users (needed for NREL API servers)
+# items that don't have to be changed by users (needed for NLR API servers)
 staging_redis_host = ""
 staging_redis_password = ""
 staging_database_host = ""
