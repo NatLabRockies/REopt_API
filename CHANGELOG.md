@@ -26,18 +26,16 @@ Classify the change according to the following categories:
     ##### Removed
     ### Patches
 
-## nrel-urls
-### Patches
-- URL updates due to NREL > NLR name change
-
 ## Develop - 2026-05-14
 ### Minor updates
 ##### Added 
 - New `CHP` fields **serve_absorption_chiller_only**, **months_serving_absorption_chiller_only**, **follow_electrical_load**, and **include_cooling_in_chp_size**
 - New output `thermal_to_absorption_chiller_series_mmbtu_per_hour` added to heating technologies `CHPOutputs`, `ElectricHeaterOutputs`, `CSTOutputs`, `BoilerOutputs`, `SteamTurbineOutputs`, and `ExistingBoilerOutputs`, and new output `storage_to_absorption_chiller_series_mmbtu_per_hour` for `HotThermalStorageOutputs` and `HighTempThermalStorageOutputs`.  
-### Changed
+##### Changed
 - Updated heating dispatch results by separating heat flows to absorption chiller from heating load served (formerly, these were aggregated).
 - Updated `HotThermalStorageOutputs` and `HighTempThermalStorageOutputs` output `storage_to_turbine_series_mmbtu_per_hour` to `storage_to_steamturbine_series_mmbtu_per_hour`
+### Patches
+- URL updates due to NREL > NLR name change
 
 ### Fixed
 - Fixed a bug in which the CHP system requires a **DomesticHotWater** load.
