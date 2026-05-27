@@ -41,6 +41,22 @@ sources {
       }
     }
   }
+
+  new {
+    image = "db-syncer"
+    path = "."
+    docker {
+      build {
+        file = "db-syncer/Dockerfile"
+        pull = true
+        buildkit = true
+        rawOptions {
+          "--build-arg"
+          "NREL_ROOT_CERT_URL_ROOT=\(secrets.`SECRET_NLR_ROOT_CERT_URL_ROOT`)"
+        }
+      }
+    }
+  }
 }
 
 destinations {
@@ -51,6 +67,11 @@ destinations {
 
   new {
     ["image"] = "julia-api"
+    ["newImage"] = "\(secrets.`SECRET_CONTAINER_REGISTRY`)/tada/reopt-api"
+  }
+
+  new {
+    ["image"] = "db-syncer"
     ["newImage"] = "\(secrets.`SECRET_CONTAINER_REGISTRY`)/tada/reopt-api"
   }
 }

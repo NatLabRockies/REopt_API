@@ -36,7 +36,6 @@ services:
       - DB_NAME=reopt
       - DB_USERNAME=reopt
       - DB_PASSWORD=reopt
-      - DB_SEARCH_PATH=public
       - REDIS_HOST=redis
       - REDIS_PASSWORD=
       - JULIA_HOST=host.docker.internal 
@@ -62,7 +61,6 @@ services:
       - DB_NAME=reopt
       - DB_USERNAME=reopt
       - DB_PASSWORD=reopt
-      - DB_SEARCH_PATH=public
       - REDIS_HOST=redis
       - REDIS_PASSWORD=
       - JULIA_HOST=host.docker.internal 

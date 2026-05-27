@@ -1,0 +1,36 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  schema_search_path: reopt_api,public
+
+development: &development
+  <<: *default
+  host: <%= ENV["DEV_DB_HOST"] || ENV["DB_HOST"] %>
+  port: <%= ENV["DEV_DB_PORT"] || ENV["DB_PORT"] %>
+  database: <%= ENV["DEV_DB_NAME"] || ENV["DB_NAME"] || "reopt_api_development" %>
+  username: <%= ENV["DEV_DB_USERNAME"] || ENV["DB_USERNAME"] %>
+  password: <%= ENV["DEV_DB_PASSWORD"] || ENV["DB_PASSWORD"] %>
+  min_messages: notice
+
+# Warning: The database defined as "test" will be erased and
+# re-generated from your development database when you run "rake".
+# Do not set this db to the same as development or production.
+test:
+  <<: *development
+  database: <%= ENV["DB_TEST_NAME"] || "reopt_api_test" %>
+
+staging:
+  <<: *default
+  host: <%= ENV["DB_HOST"] || ENV["SECRET_DB_HOST"] %>
+  port: <%= ENV["DB_PORT"] || ENV["SECRET_DB_PORT"] %>
+  database: <%= ENV["DB_NAME"] || ENV["SECRET_DB_NAME"] %>
+  username: <%= ENV["DB_USERNAME"] || ENV["SECRET_DB_USERNAME"] %>
+  password: <%= ENV["DB_PASSWORD"] || ENV["SECRET_DB_PASSWORD"] %>
+
+production:
+  <<: *default
+  host: <%= ENV["DB_HOST"] || ENV["SECRET_DB_HOST"] %>
+  port: <%= ENV["DB_PORT"] || ENV["SECRET_DB_PORT"] %>
+  database: <%= ENV["DB_NAME"] || ENV["SECRET_DB_NAME"] %>
+  username: <%= ENV["DB_USERNAME"] || ENV["SECRET_DB_USERNAME"] %>
+  password: <%= ENV["DB_PASSWORD"] || ENV["SECRET_DB_PASSWORD"] %>

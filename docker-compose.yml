@@ -88,11 +88,12 @@ services:
 
   db-syncer:
     build:
-      context: db-syncer
+      context: .
+      dockerfile: db-syncer/Dockerfile
       args:
         BUNDLE_FROZEN: "false"
     volumes:
-      - .:/app
+      # - .:/app
       - ~/.vault-token:/root/.vault-token:ro
     depends_on:
       - db
