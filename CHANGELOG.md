@@ -25,9 +25,9 @@ Classify the change according to the following categories:
     ##### Deprecated
     ##### Removed
     ### Patches
-    
 
-## Develop - 2026-05-14
+
+## v3.19.1
 ### Patches
 - URL updates due to NREL > NLR name change
 
