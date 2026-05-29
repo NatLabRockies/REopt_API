@@ -1,4 +1,4 @@
-# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NREL/REopt_API/blob/master/LICENSE.
+# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NatLabRockies/REopt_API/blob/master/LICENSE.
 from django.db import models
 from django.db.models import Q
 import uuid
@@ -1590,7 +1590,7 @@ def avert_emissions_profile(request):
         debug_msg = "exc_type: {}; exc_value: {}; exc_traceback: {}".format(exc_type, exc_value.args[0],
                                                                             tb.format_tb(exc_traceback))
         log.error(debug_msg)
-        return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nrel.gov if problems persist."}, status=500)
+        return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nlr.gov if problems persist."}, status=500)
 
 def cambium_profile(request):
     try:
@@ -1632,7 +1632,7 @@ def cambium_profile(request):
         debug_msg = "exc_type: {}; exc_value: {}; exc_traceback: {}".format(exc_type, exc_value.args[0],
                                                                             tb.format_tb(exc_traceback))
         log.error(debug_msg)
-        return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nrel.gov if problems persist."}, status=500)
+        return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nlr.gov if problems persist."}, status=500)
 
 def easiur_costs(request):
     try:
@@ -1667,7 +1667,7 @@ def easiur_costs(request):
         debug_msg = "exc_type: {}; exc_value: {}; exc_traceback: {}".format(exc_type, exc_value.args[0],
                                                                             tb.format_tb(exc_traceback))
         log.error(debug_msg)
-        return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nrel.gov if problems persist."}, status=500)
+        return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nlr.gov if problems persist."}, status=500)
 
 def get_load_metrics(request):
     try:
@@ -1759,7 +1759,7 @@ def sector_defaults(request):
         debug_msg = "exc_type: {}; exc_value: {}; exc_traceback: {}".format(exc_type, exc_value.args[0],
                                                                             tb.format_tb(exc_traceback))
         log.error(debug_msg)
-        return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nrel.gov if problems persist."}, status=500)
+        return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nlr.gov if problems persist."}, status=500)
 
 # def fuel_emissions_rates(request):
 #     try:
@@ -1799,7 +1799,7 @@ def sector_defaults(request):
 #         debug_msg = "exc_type: {}; exc_value: {}; exc_traceback: {}".format(exc_type, exc_value.args[0],
 #                                                                             tb.format_tb(exc_traceback))
 #         log.error(debug_msg)
-#         return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nrel.gov if problems persist."}, status=500)
+#         return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nlr.gov if problems persist."}, status=500)
 
 ##############################################################################################################################
 ################################################# START Results Table #########################################################
@@ -2348,7 +2348,7 @@ def generate_excel_workbook(df: pd.DataFrame, custom_table: List[Dict[str, Any]]
             # Final Note and Contact Info
             instructions_worksheet.write(row, 0, "Thank you for using the REopt Results Table Workbook!", subtitle_format)
             row += 1
-            contact_info = "For support or feedback, please contact the REopt team at reopt@nrel.gov."
+            contact_info = "For support or feedback, please contact the REopt team at reopt@nlr.gov."
             instructions_worksheet.write(row, 0, contact_info, subtitle_format)
             # Freeze panes to keep the title visible
             instructions_worksheet.freeze_panes(1, 0)

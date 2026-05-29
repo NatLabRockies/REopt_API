@@ -1,4 +1,4 @@
-# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NREL/REopt_API/blob/master/LICENSE.
+# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NatLabRockies/REopt_API/blob/master/LICENSE.
 from django.db import models
 import copy
 import pandas as pd
@@ -246,11 +246,11 @@ class CostForecasts(object):
 
     def pv(self, year: int, type: str) -> int:
         """
-        Return capital or O&M costs from NREL ATB forecasts for given year.
+        Return capital or O&M costs from NLR ATB forecasts for given year.
         As of 2021-03-30 we have values for each year from 2022 to 2050 inclusive
         :param year: any int from 2022 to 2050 inclusive
         :param type: one of ["capital_cost_dollars_per_kw", "fixed_om_dollars_per_kw_per_yr"]
-        :return: float, cost taken from NREL ATB
+        :return: float, cost taken from NLR ATB
         """
         return self.pv_costs.loc[type, year]
 
