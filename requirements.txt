@@ -42,7 +42,7 @@ executing==2.2.1
 fastjsonschema==2.21.2
 fiona==1.10.1
 future==1.0.0
-geopandas==1.1.1
+geopandas==1.1.2
 gitdb==4.0.12
 GitPython==3.1.45
 google-api-core==2.25.1
