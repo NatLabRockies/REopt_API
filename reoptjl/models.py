@@ -3753,6 +3753,26 @@ class ElectricStorageInputs(BaseModel, models.Model):
         blank=True,
         help_text="Battery state of charge at first hour of optimization as fraction of energy capacity."
     )
+    fixed_soc_series_fraction = ArrayField(
+        models.FloatField(
+            validators=[
+                MinValueValidator(0),
+                MaxValueValidator(1)
+            ],
+            blank=True
+        ),
+        default=list, blank=True,
+        help_text=("If provided, SOC (as fraction of total energy capacity) will not be optimized and will instead be fixed to the values provided"
+                   "here +- the absolute fixed_soc_series_fraction_tolerance. Must be an array of values 0-1 with length equal to 8760*time_steps_per_hour.")
+    )
+    fixed_soc_series_fraction_tolerance = models.FloatField(
+        validators=[
+            MinValueValidator(-1),
+            MaxValueValidator(1)
+        ],
+        null=True, blank=True,
+        help_text="Absolute tolerance on fixed_soc_series_fraction to avoid infeasible solutions when fixed_soc_series_fraction is provided."
+    )
     can_grid_charge = models.BooleanField(
         blank=True,
         help_text="Flag to set whether the battery can be charged from the grid, or just onsite generation."
@@ -3944,7 +3964,7 @@ class ElectricStorageOutputs(BaseModel, models.Model):
     )
     initial_capital_cost = models.FloatField(null=True, blank=True)
     maintenance_cost = models.FloatField(null=True, blank=True)
-    state_of_health = ArrayField(
+    state_of_health_series_fraction = ArrayField(
         models.FloatField(null=True, blank=True),
         blank=True, default=list
     )
