@@ -1,4 +1,4 @@
-# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NREL/REopt_API/blob/master/LICENSE.
+# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NatLabRockies/REopt_API/blob/master/LICENSE.
 import logging
 import pandas as pd
 from reoptjl.models import MAX_BIG_NUMBER, APIMeta, ExistingBoilerInputs, UserProvidedMeta, SiteInputs, Settings, ElectricLoadInputs, ElectricTariffInputs, \
@@ -542,7 +542,7 @@ class InputValidator(object):
         """
         
         def validate_offgrid_keys(self):
-            # From https://github.com/NREL/REopt.jl/blob/4b0fb7f6556b2b6e9a9a7e8fa65398096fb6610f/src/core/scenario.jl#L88         
+            # From https://github.com/NatLabRockies/REopt.jl/blob/4b0fb7f6556b2b6e9a9a7e8fa65398096fb6610f/src/core/scenario.jl#L88         
             valid_input_keys_offgrid = ["PV", "Wind", "ElectricStorage", "Generator", "Settings", "Site", "Financial", "ElectricLoad", "ElectricTariff", "ElectricUtility", "Meta"]
 
             invalid_input_keys_offgrid = list(set(list(self.models.keys()))-set(valid_input_keys_offgrid))
@@ -668,8 +668,8 @@ def validate_time_series(series: list, time_steps_per_hour: int) -> Tuple[list, 
 def lat_lon_in_windtoolkit(lat, lon):
     """
     Convert latitude, longitude into integer values for wind tool kit database.
-    Modified from "indicesForCoord" in https://github.com/NREL/hsds-examples/blob/master/notebooks/01_introduction.ipynb
-    Questions? Perr-Sauer, Jordan <Jordan.Perr-Sauer@nrel.gov>
+    Modified from "indicesForCoord" in https://github.com/NatLabRockies/hsds-examples/blob/master/notebooks/01_introduction.ipynb
+    Questions? Perr-Sauer, Jordan <Jordan.Perr-Sauer@nlr.gov>
     """
     projstring = """+proj=lcc +lat_1=30 +lat_2=60 
                     +lat_0=38.47240422490422 +lon_0=-96.0 
