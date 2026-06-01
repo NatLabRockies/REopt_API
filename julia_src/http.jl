@@ -1,4 +1,4 @@
-using HTTP, JSON, JuMP
+﻿using HTTP, JSON, JuMP
 using HiGHS, Cbc, SCIP
 using GhpGhx
 import REopt as reoptjl  # For REopt.jl, needed because we still have local REopt.jl module for V1/V2
@@ -8,6 +8,7 @@ DotEnv.load!()
 const test_nrel_developer_api_key = ENV["NREL_DEVELOPER_API_KEY"]
 
 ENV["NREL_DEVELOPER_EMAIL"] = "reopt@nlr.gov"
+include("mpc.jl")
 
 include("os_solvers.jl")
 
@@ -64,6 +65,27 @@ function reopt(req::HTTP.Request)
         ENV["NREL_DEVELOPER_API_KEY"] = test_nrel_developer_api_key
         delete!(d, "api_key")
     end
+
+    # ---- API-only battery heuristic dispatch strategy: "daily_foresight_optimized" ----
+    # When ElectricStorage.dispatch_options == "daily_foresight_optimized", first run the MPC rolling-horizon loop to get an SOC profile. 
+    # Then set ElectricStorage.fixed_soc_series_fraction = MPC SOC before running the main REopt optimization.
+    electric_storage = get(d, "ElectricStorage", Dict())
+    if get(electric_storage, "dispatch_options", nothing) == "daily_foresight_optimized"
+        try
+            @info "Running MPC to obtain daily foresight optimized battery dispatch profile."
+            mpc_results = get_mpc_results(d)
+            soc = mpc_results["dispatch"]["ElectricStorage"]["soc_series_fraction"]
+            d["ElectricStorage"]["fixed_soc_series_fraction"] = soc
+            d["ElectricStorage"]["dispatch_options"] = "custom"
+        catch e
+            @error "MPC pre-solve failed" exception=(e, catch_backtrace())
+            return HTTP.Response(500, JSON.json(Dict(
+                "error" => "MPC pre-solve failed: " * sprint(showerror, e),
+                "reopt_version" => string(pkgversion(reoptjl)),
+            )))
+        end
+    end
+
     settings = d["Settings"]
     solver_name = get(settings, "solver_name", "HiGHS")    
     if solver_name == "Xpress" && !(xpress_installed=="True")
@@ -810,6 +832,33 @@ function job_no_xpress(req::HTTP.Request)
     return HTTP.Response(500, JSON.json(error_response))
 end
 
+
+function mpc(req::HTTP.Request)
+    d = JSON.parse(String(req.body))
+    error_response = Dict()
+    results = Dict()
+    try
+        if !isempty(get(d, "api_key", ""))
+            ENV["NREL_DEVELOPER_API_KEY"] = pop!(d, "api_key")
+        else
+            ENV["NREL_DEVELOPER_API_KEY"] = test_nrel_developer_api_key
+            delete!(d, "api_key")
+        end
+        results = get_mpc_results(d)
+    catch e
+        @error "MPC failed" exception=(e, catch_backtrace())
+        error_response["error"] = sprint(showerror, e)
+        error_response["reopt_version"] = string(pkgversion(reoptjl))
+    end
+    GC.gc()
+    if isempty(error_response)
+        @info "MPC ran successfully."
+        return HTTP.Response(200, JSON.json(results))
+    else
+        return HTTP.Response(500, JSON.json(error_response))
+    end
+end
+
 # define REST endpoints to dispatch to "service" functions
 const ROUTER = HTTP.Router()
 
@@ -820,6 +869,7 @@ else
 end
 HTTP.register!(ROUTER, "POST", "/reopt", reopt)
 HTTP.register!(ROUTER, "POST", "/erp", erp)
+HTTP.register!(ROUTER, "POST", "/mpc", mpc)
 HTTP.register!(ROUTER, "POST", "/ghpghx", ghpghx)
 HTTP.register!(ROUTER, "GET", "/chp_defaults", chp_defaults)
 HTTP.register!(ROUTER, "GET", "/avert_emissions_profile", avert_emissions_profile)
