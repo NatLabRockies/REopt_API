@@ -368,6 +368,9 @@ class InputValidator(object):
                     self.models["ElectricStorage"].can_grid_charge = True
                 else:
                     self.models["ElectricStorage"].can_grid_charge = False
+            
+            if len(self.models["ElectricStorage"].__getattribute__("fixed_soc_series_fraction")) > 1:
+                self.clean_time_series("ElectricStorage", "fixed_soc_series_fraction")
 
         
         """
