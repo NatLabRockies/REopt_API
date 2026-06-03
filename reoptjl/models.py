@@ -1323,8 +1323,14 @@ class ElectricLoadInputs(BaseModel, models.Model):
         ["doe_reference_name", "monthly_totals_kwh"],
         ["annual_kwh", "doe_reference_name"],
         ["doe_reference_name"],
-        ["blended_doe_reference_names", "blended_doe_reference_percents"]
+        ["blended_doe_reference_names", "blended_doe_reference_percents"],
+        ["load_components"]  # NEW: Multiple load components
     ]
+    
+    LEAP_POLICY = models.TextChoices('LEAP_POLICY', 
+        'truncate_dec31 '
+        'drop_feb29'
+    )
 
     DOE_REFERENCE_NAME = models.TextChoices('DOE_REFERENCE_NAME', (
         'FastFoodRest '
@@ -1495,6 +1501,40 @@ class ElectricLoadInputs(BaseModel, models.Model):
         help_text=("Used in concert with blended_doe_reference_names to create a blended load profile from multiple "
                    "DoE Commercial Reference Buildings. Must sum to 1.0.")
     )
+    
+    # NEW FIELDS for Multiple Load Components Feature
+    load_components = models.JSONField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text=(
+            "Dictionary of load components from different source years to be aligned. "
+            "When provided, overrides loads_kw, doe_reference_name, and related single-load parameters. "
+            "Format: {'component_name': {'loads_kw': [...], 'year': 2016}, ...}. "
+            "Each component must specify either 'loads_kw', 'doe_reference_name', or 'blended_doe_reference_names'."
+        )
+    )
+    
+    leap_policy = models.TextField(
+        null=False,
+        blank=True,
+        default="truncate_dec31",
+        choices=LEAP_POLICY.choices,
+        help_text=(
+            "How to normalize leap year data (8784 hours) to standard year (8760 hours). "
+            "Only used when load_components is provided. Default is 'truncate_dec31'."
+        )
+    )
+    
+    preserve_component_data = models.BooleanField(
+        null=False,
+        blank=True,
+        default=True,
+        help_text=(
+            "Whether to include component-level load data in results output. "
+            "Only applies when load_components is provided. Default is True."
+        )
+    )
     # outage_is_major_event = models.BooleanField(
     #     null=True,
     #     blank=True,
@@ -1511,24 +1551,123 @@ class ElectricLoadInputs(BaseModel, models.Model):
     def clean(self):
         error_messages = {}
 
-        # possible sets for defining load profile
-        if not at_least_one_set(self.dict, self.possible_sets):
-            error_messages["required inputs"] = \
-                "Must provide at least one set of valid inputs from {}.".format(self.possible_sets)
+        # Check if using new load_components feature
+        if self.load_components is not None:
+            # Validate component structure
+            comp_errors = self._validate_load_components()
+            if comp_errors:
+                error_messages.update(comp_errors)
+        else:
+            # Original validation logic for single load
+            # possible sets for defining load profile
+            if not at_least_one_set(self.dict, self.possible_sets):
+                error_messages["required inputs"] = \
+                    "Must provide at least one set of valid inputs from {}.".format(self.possible_sets)
 
-        if len(self.blended_doe_reference_names) > 0 and self.doe_reference_name == "":
-            if len(self.blended_doe_reference_names) != len(self.blended_doe_reference_percents):
-                error_messages["blended_doe_reference_names"] = \
-                    "The number of blended_doe_reference_names must equal the number of blended_doe_reference_percents."
-            if not math.isclose(sum(self.blended_doe_reference_percents),  1.0):
-                error_messages["blended_doe_reference_percents"] = "Sum must = 1.0."
+            if len(self.blended_doe_reference_names) > 0 and self.doe_reference_name == "":
+                if len(self.blended_doe_reference_names) != len(self.blended_doe_reference_percents):
+                    error_messages["blended_doe_reference_names"] = \
+                        "The number of blended_doe_reference_names must equal the number of blended_doe_reference_percents."
+                if not math.isclose(sum(self.blended_doe_reference_percents),  1.0):
+                    error_messages["blended_doe_reference_percents"] = "Sum must = 1.0."
 
-        if self.doe_reference_name != "" or \
-                len(self.blended_doe_reference_names) > 0:
-            self.year = 2017  # the validator provides an "info" message regarding this
+            if self.doe_reference_name != "" or \
+                    len(self.blended_doe_reference_names) > 0:
+                self.year = 2017  # the validator provides an "info" message regarding this
 
         if error_messages:
             raise ValidationError(error_messages)
+    
+    def _validate_load_components(self):
+        """Validate load_components structure for multiple load components feature"""
+        errors = {}
+        
+        if not isinstance(self.load_components, dict):
+            errors["load_components"] = "Must be a dictionary/object with component names as keys"
+            return errors
+        
+        if len(self.load_components) == 0:
+            errors["load_components"] = "Must contain at least one component"
+            return errors
+        
+        if len(self.load_components) > 10:
+            errors["load_components"] = "Maximum of 10 components allowed"
+            return errors
+        
+        # Validate each component
+        for comp_name, comp_data in self.load_components.items():
+            comp_errors = self._validate_single_component(comp_name, comp_data)
+            if comp_errors:
+                for error in comp_errors:
+                    error_key = f"load_components.{comp_name}"
+                    if error_key in errors:
+                        errors[error_key] += f"; {error}"
+                    else:
+                        errors[error_key] = error
+        
+        return errors
+    
+    def _validate_single_component(self, comp_name, comp_data):
+        """Validate a single load component"""
+        errors = []
+        
+        if not isinstance(comp_data, dict):
+            errors.append(f"Component '{comp_name}' must be a dictionary/object")
+            return errors
+        
+        # Must have 'year'
+        if 'year' not in comp_data:
+            errors.append("Must have a 'year' specified")
+        else:
+            year = comp_data['year']
+            if not isinstance(year, int) or year < 1900 or year > 2100:
+                errors.append(f"Invalid year: {year} (must be between 1900 and 2100)")
+        
+        # Must have one load specification method
+        has_loads = 'loads_kw' in comp_data
+        has_doe = 'doe_reference_name' in comp_data
+        has_blended = 'blended_doe_reference_names' in comp_data
+        
+        if not (has_loads or has_doe or has_blended):
+            errors.append(
+                "Must provide 'loads_kw', 'doe_reference_name', or 'blended_doe_reference_names'"
+            )
+        
+        # Validate loads_kw if provided
+        if has_loads:
+            loads = comp_data['loads_kw']
+            if not isinstance(loads, list):
+                errors.append("'loads_kw' must be an array")
+            elif len(loads) not in [8760, 8784, 17520, 35040]:
+                errors.append(
+                    f"'loads_kw' must have 8760 or 8784 hours (or 17520/35040 for sub-hourly), got {len(loads)}"
+                )
+        
+        # Validate DOE reference name if provided
+        if has_doe:
+            doe_name = comp_data['doe_reference_name']
+            valid_names = [choice[0].strip() for choice in self.DOE_REFERENCE_NAME.choices]
+            if doe_name not in valid_names:
+                errors.append(
+                    f"Invalid doe_reference_name: '{doe_name}'. Must be one of {valid_names}"
+                )
+        
+        # Validate blended DOE if provided
+        if has_blended:
+            blended_names = comp_data.get('blended_doe_reference_names', [])
+            blended_percents = comp_data.get('blended_doe_reference_percents', [])
+            
+            if not isinstance(blended_names, list) or not isinstance(blended_percents, list):
+                errors.append("'blended_doe_reference_names' and 'blended_doe_reference_percents' must be arrays")
+            elif len(blended_names) != len(blended_percents):
+                errors.append(
+                    f"'blended_doe_reference_names' ({len(blended_names)} items) must have same length as "
+                    f"'blended_doe_reference_percents' ({len(blended_percents)} items)"
+                )
+            elif len(blended_percents) > 0 and not math.isclose(sum(blended_percents), 1.0):
+                errors.append(f"'blended_doe_reference_percents' must sum to 1.0, got {sum(blended_percents)}")
+        
+        return errors if errors else None
 
 
 class ElectricLoadOutputs(BaseModel, models.Model):
@@ -1614,6 +1753,44 @@ class ElectricLoadOutputs(BaseModel, models.Model):
         ),
         default=list,
         help_text="Percentage of total electric load met on an annual basis, for off-grid scenarios only"
+    )
+    
+    # NEW FIELDS for Multiple Load Components Feature - Results
+    has_components = models.BooleanField(
+        null=True,
+        blank=True,
+        default=False,
+        help_text="True if ElectricLoad was created using load_components"
+    )
+    
+    component_loads = models.JSONField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text=(
+            "Component-level load profiles aligned to target year. "
+            "Format: {'component_name': [8760 hourly kW values], ...}"
+        )
+    )
+    
+    component_metadata = models.JSONField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text=(
+            "Metadata about each component's alignment. "
+            "Includes original_year, aligned_to_year, energy conservation metrics, etc."
+        )
+    )
+    
+    load_alignment_summary = models.JSONField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text=(
+            "Summary of the load alignment process. "
+            "Includes reference_year, components_aligned, leap_policy_used, etc."
+        )
     )
 
 class ElectricTariffInputs(BaseModel, models.Model):

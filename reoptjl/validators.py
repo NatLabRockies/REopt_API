@@ -136,14 +136,44 @@ class InputValidator(object):
         if self.resampling_messages:
             msg_dict["resampled inputs"] = self.resampling_messages
 
-        if self.models["ElectricLoad"].doe_reference_name != "" or \
-                len(self.models["ElectricLoad"].blended_doe_reference_names) > 0:
-            msg_dict["info"] = ("When using doe_reference_name or blended_doe_reference_names for ElectricLoad the "
-                                "year is set to 2017 because the DoE load profiles start on a Sunday.")
-        if self.models["ElectricLoad"].doe_reference_name != "" and \
-                len(self.models["ElectricLoad"].blended_doe_reference_names) > 0:
-            msg_dict["ignored inputs"] = ("Both doe_reference_name and blended_doe_reference_names were provided for "
-                                "ElectricLoad. This is redundant, so only doe_reference_name is being used.")
+        # Check for load_components usage
+        if self.models["ElectricLoad"].load_components is not None:
+            # Check for redundant single-load fields
+            ignored_fields = []
+            if len(self.models["ElectricLoad"].loads_kw) > 0:
+                ignored_fields.append("loads_kw")
+            if self.models["ElectricLoad"].doe_reference_name != "":
+                ignored_fields.append("doe_reference_name")
+            if len(self.models["ElectricLoad"].blended_doe_reference_names) > 0:
+                ignored_fields.append("blended_doe_reference_names and blended_doe_reference_percents")
+            
+            if ignored_fields:
+                msg_dict["ignored inputs"] = (
+                    f"ElectricLoad has both 'load_components' and {', '.join(ignored_fields)}. "
+                    "Using 'load_components' and ignoring the single-load parameters."
+                )
+            
+            # Info message about target year
+            if self.models["ElectricLoad"].year:
+                if "info" in msg_dict:
+                    msg_dict["info"] += f" When using load_components, the 'year' field " \
+                                       f"({self.models['ElectricLoad'].year}) is used as the target " \
+                                       "alignment year for all components."
+                else:
+                    msg_dict["info"] = (f"When using load_components, the 'year' field "
+                                       f"({self.models['ElectricLoad'].year}) is used as the target "
+                                       "alignment year for all components.")
+        else:
+            # Original validation logic for single load
+            if self.models["ElectricLoad"].doe_reference_name != "" or \
+                    len(self.models["ElectricLoad"].blended_doe_reference_names) > 0:
+                msg_dict["info"] = ("When using doe_reference_name or blended_doe_reference_names for ElectricLoad the "
+                                    "year is set to 2017 because the DoE load profiles start on a Sunday.")
+            if self.models["ElectricLoad"].doe_reference_name != "" and \
+                    len(self.models["ElectricLoad"].blended_doe_reference_names) > 0:
+                msg_dict["ignored inputs"] = ("Both doe_reference_name and blended_doe_reference_names were provided for "
+                                    "ElectricLoad. This is redundant, so only doe_reference_name is being used.")
+        
         if self.models["Settings"].off_grid_flag==True:
             if "ElectricTariff" in self.models.keys():
                 msg_dict["ignored inputs"] = ("ElectricTariff inputs are not applicable when off_grid_flag is true, and will be ignored. "
