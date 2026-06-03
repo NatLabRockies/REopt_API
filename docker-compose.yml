@@ -98,6 +98,7 @@ services:
     depends_on:
       - db
     environment:
+      - LOAD_VAULT_ENV_SECRETS=true
       - DEV_DB_HOST=db
       - DEV_DB_NAME=reopt_api
       - DEV_DB_USERNAME=reopt
