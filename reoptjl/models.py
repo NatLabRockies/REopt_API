@@ -3668,6 +3668,16 @@ class ElectricStorageInputs(BaseModel, models.Model):
         primary_key=True
     )
 
+    size_class = models.IntegerField(
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(5)
+        ],
+        null=True,
+        blank=True,
+        help_text="ElectricStorage size class. Must be an integer value between 1 and 3. Default is calculated per ratio of annual peak and average load of given load profile."
+    )
+
     min_kw = models.FloatField(
         default=0,
         validators=[
@@ -3778,29 +3788,29 @@ class ElectricStorageInputs(BaseModel, models.Model):
         help_text="Flag to set whether the battery can be charged from the grid, or just onsite generation."
     )
     installed_cost_per_kw = models.FloatField(
-        default=968.0,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0e4)
         ],
+        null=True,
         blank=True,
         help_text="Total upfront battery power capacity costs (e.g. inverter and balance of power systems)"
     )
     installed_cost_per_kwh = models.FloatField(
-        default=253.0,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0e4)
         ],
+        null=True,
         blank=True,
         help_text="Total upfront battery costs"
     )
     installed_cost_constant = models.FloatField(
-        default=222115.0,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0e9)
         ],
+        null=True,
         blank=True,
         help_text="Fixed upfront cost for battery installation, independent of size."
     )

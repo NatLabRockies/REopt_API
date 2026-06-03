@@ -805,6 +805,51 @@ function pv_cost_defaults(req::HTTP.Request)
 end
 
 
+function electric_storage_cost_defaults(req::HTTP.Request)
+    d = JSON.parse(String(req.body))
+    float_vals = ["installed_cost_per_kw", "installed_cost_per_kwh", 
+                    "installed_cost_constant", "min_kw", "max_kw",
+                    "electric_load_annual_peak", "electric_load_average"]    
+    int_vals = ["size_class"]
+    string_vals = []
+    bool_vals = []
+    all_vals = vcat(int_vals, string_vals, float_vals, bool_vals)
+    # Process .json inputs and convert to correct type if needed
+    for k in all_vals
+        if !isnothing(get(d, k, nothing))
+            # TODO improve this by checking if the type is not the expected type, as opposed to just not string
+            if k in float_vals && typeof(d[k]) == String
+                d[k] = parse(Float64, d[k])
+            elseif k in int_vals && typeof(d[k]) == String
+                d[k] = parse(Int64, d[k])
+            elseif k in bool_vals && typeof(d[k]) == String
+                d[k] = parse(Bool, d[k])
+            end
+        end
+    end
+
+    @info "Getting ElectricStorage cost defaults..."
+    data = Dict()
+    error_response = Dict()
+    try
+        data["installed_cost_per_kw"], data["installed_cost_per_kwh"], data["installed_cost_constant"], data["size_class"], data["size_kw_for_size_class"] = reoptjl.get_electric_storage_cost_params(;
+             (Symbol(k) => v for (k, v) in pairs(d))...
+        )
+    catch e
+        @error "Something went wrong in the electric_storage_cost_defaults" exception=(e, catch_backtrace())
+        error_response["error"] = sprint(showerror, e)
+    end
+    if isempty(error_response)
+        @info "ElectricStorage cost defaults determined."
+		response = data
+        return HTTP.Response(200, JSON.json(response))
+    else
+        @info "An error occured in the electric_storage_cost_defaults endpoint"
+        return HTTP.Response(500, JSON.json(error_response))
+    end
+end
+
+
 function job_no_xpress(req::HTTP.Request)
     error_response = Dict("error" => "V1 and V2 not available without Xpress installation.")
     return HTTP.Response(500, JSON.json(error_response))
@@ -834,5 +879,6 @@ HTTP.register!(ROUTER, "GET", "/health", health)
 HTTP.register!(ROUTER, "GET", "/get_existing_chiller_default_cop", get_existing_chiller_default_cop)
 HTTP.register!(ROUTER, "GET", "/get_ashp_defaults", get_ashp_defaults)
 HTTP.register!(ROUTER, "GET", "/pv_cost_defaults", pv_cost_defaults)
+HTTP.register!(ROUTER, "GET", "/electric_storage_cost_defaults", electric_storage_cost_defaults)
 HTTP.register!(ROUTER, "GET", "/get_load_metrics", get_load_metrics)
 HTTP.serve(ROUTER, "0.0.0.0", 8081, reuseaddr=true)
