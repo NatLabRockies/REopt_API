@@ -4,7 +4,6 @@ on:
   schedule:
     - cron: "40 5 * * *" # Every day at 10:40 PM MST / 11:40 PM MDT
   workflow_dispatch:
-  push:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
