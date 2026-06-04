@@ -24,13 +24,13 @@ staging:
   host: <%= ENV["DB_HOST"] || ENV["SECRET_DB_HOST"] %>
   port: <%= ENV["DB_PORT"] || ENV["SECRET_DB_PORT"] %>
   database: <%= ENV["DB_NAME"] || ENV["SECRET_DB_NAME"] %>
-  username: <%= ENV["DB_USERNAME"] || ENV["SECRET_DB_USERNAME"] %>
-  password: <%= ENV["DB_PASSWORD"] || ENV["SECRET_DB_PASSWORD"] %>
+  username: <%= ENV["DB_USERNAME"] || ENV["SECRET_DB_SUPERUSER_USERNAME"] || ENV["SECRET_DB_USERNAME"] %>
+  password: <%= ENV["DB_PASSWORD"] || ENV["SECRET_DB_SUPERUSER_PASSWORD"] || ENV["SECRET_DB_PASSWORD"] %>
 
 production:
   <<: *default
   host: <%= ENV["DB_HOST"] || ENV["SECRET_DB_HOST"] %>
   port: <%= ENV["DB_PORT"] || ENV["SECRET_DB_PORT"] %>
   database: <%= ENV["DB_NAME"] || ENV["SECRET_DB_NAME"] %>
-  username: <%= ENV["DB_USERNAME"] || ENV["SECRET_DB_USERNAME"] %>
-  password: <%= ENV["DB_PASSWORD"] || ENV["SECRET_DB_PASSWORD"] %>
+  username: <%= ENV["DB_USERNAME"] || ENV["SECRET_DB_SUPERUSER_USERNAME"] || ENV["SECRET_DB_USERNAME"] %>
+  password: <%= ENV["DB_PASSWORD"] || ENV["SECRET_DB_SUPERUSER_PASSWORD"] || ENV["SECRET_DB_PASSWORD"] %>
