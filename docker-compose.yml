@@ -86,6 +86,8 @@ services:
       - ./julia_src:/opt/julia_src
 
   db-syncer:
+    profiles:
+      - db-syncer
     build:
       context: .
       dockerfile: db-syncer/Dockerfile
