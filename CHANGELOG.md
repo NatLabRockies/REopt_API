@@ -27,6 +27,10 @@ Classify the change according to the following categories:
     ### Patches
 
 
+## v3.19.1
+### Patches
+- URL updates due to NREL > NLR name change
+
 ## v3.19.0
 ### Minor updates
 ##### Added 
@@ -39,8 +43,6 @@ Classify the change according to the following categories:
 ##### Fixed
 - Fixed a bug in which the CHP system requires a **DomesticHotWater** load.
 - Fixed a bug in which the storage to steam turbine flow was included in the thermal heating load served.
-
-
 
 ## v3.18.0
 ### Minor Updates
