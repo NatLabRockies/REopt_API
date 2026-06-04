@@ -7,10 +7,11 @@ services:
       - 6379
 
   db:
-    image: postgres
+    image: postgres:18
     restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql
     environment:
-      - POSTGRES_USER=reopt
       - POSTGRES_PASSWORD=reopt
       - POSTGRES_DB=reopt
     expose:
@@ -27,9 +28,8 @@ services:
       - APP_ENV=local
       - DB_HOST=db
       - DB_NAME=reopt
-      - DB_USERNAME=reopt
+      - DB_USERNAME=postgres
       - DB_PASSWORD=reopt
-      - DB_SEARCH_PATH=public
       - REDIS_HOST=redis
       - REDIS_PASSWORD=
       - NLR_API_KEY
@@ -52,9 +52,8 @@ services:
       - APP_ENV=local
       - DB_HOST=db
       - DB_NAME=reopt
-      - DB_USERNAME=reopt
+      - DB_USERNAME=postgres
       - DB_PASSWORD=reopt
-      - DB_SEARCH_PATH=public
       - REDIS_HOST=redis
       - REDIS_PASSWORD=
       - NLR_API_KEY
@@ -70,7 +69,7 @@ services:
       - 8000:8000
     volumes:
       - .:/opt/reopt
-  
+
   julia:
     container_name: julia_api
     build:
@@ -85,3 +84,26 @@ services:
       - "8081:8081"
     volumes:
       - ./julia_src:/opt/julia_src
+
+  db-syncer:
+    profiles:
+      - db-syncer
+    build:
+      context: .
+      dockerfile: db-syncer/Dockerfile
+      args:
+        BUNDLE_FROZEN: "false"
+    volumes:
+      - .:/app
+      - ~/.vault-token:/root/.vault-token:ro
+    depends_on:
+      - db
+    environment:
+      - LOAD_VAULT_ENV_SECRETS=true
+      - DEV_DB_HOST=db
+      - DEV_DB_NAME=reopt_api
+      - DEV_DB_USERNAME=postgres
+      - DEV_DB_PASSWORD=reopt
+
+volumes:
+  postgres_data:

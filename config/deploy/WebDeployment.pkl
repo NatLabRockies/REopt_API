@@ -13,6 +13,7 @@ import "@tadaSharedKube/TadaEcrLoginRenewServiceAccount.pkl"
 import "@tadaSharedKube/TadaWebConfigMap.pkl"
 import "@tadaSharedKube/TadaWebDbMigrateJob.pkl"
 import "@tadaSharedKube/TadaWebDbMigrateSecrets.pkl"
+import "@tadaSharedKube/TadaWebDbSyncRestoreJob.pkl"
 import "@tadaSharedKube/TadaWebDeployment.pkl"
 import "@tadaSharedKube/TadaWebIngress.pkl"
 import "@tadaSharedKube/TadaWebPodDisruptionBudget.pkl"
@@ -70,6 +71,13 @@ resources: Listing<K8sResource> = new {
   webSecrets
 
   new TadaWebDbMigrateSecrets {}
+
+  when (deployMetadata.`perform-db-sync-restore` == "true") {
+    new TadaWebDbSyncRestoreJob {
+      tadaContainerImage = "db-syncer"
+      tadaImagePullSecretName = ecrLoginRenewConfigMapResource.imagePullSecretName
+    }
+  }
 
   new TadaWebDbMigrateJob {
     tadaContainerImage = containerImage

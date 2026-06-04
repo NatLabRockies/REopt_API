@@ -127,3 +127,9 @@ compare_run_*.json
 
 /config/deploy/external
 /config/deploy/tmp
+docker-compose.override.yml
+
+!/db-syncer/lib/
+/db-syncer/db/structure.sql
+/db-syncer/log
+/db-syncer/tmp

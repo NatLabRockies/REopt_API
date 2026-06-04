@@ -17,3 +17,7 @@ werf.yaml
 Dockerfile*
 .dockerignore
 /config/deploy
+
+/db-syncer/tmp
+/db-syncer/log
+!/db-syncer/.gomplate.yaml

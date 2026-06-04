@@ -1,0 +1,50 @@
+name: DB Sync Dump
+
+on:
+  schedule:
+    - cron: "40 5 * * *" # Every day at 10:40 PM MST / 11:40 PM MDT
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vault-nonsensitive-secrets:
+    name: Vault Non-Sensitive Secrets
+    runs-on: self-hosted
+    outputs:
+      nonsensitive-secrets: ${{ steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets }}
+    steps:
+      - name: Import vault nonsensitive secrets
+        id: vault-nonsensitive-secrets
+        uses: TADA/vault-action/nonsensitive-secrets@v1
+        with:
+          template: |
+            {{ with (datasource "vault" "reopt-api/ci/deploy").data }}
+              {{ $secrets = coll.Merge (coll.Dict
+                "container_registry" .container_registry
+                "staging_rancher_project_id" .staging_rancher_project_id
+              ) $secrets }}
+            {{ end }}
+          vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
+          vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
+
+  dump:
+    name: Dump
+    uses: TADA/deploy-action/.github/workflows/run-job.yml@v2
+    needs:
+      - vault-nonsensitive-secrets
+    with:
+      job-name: reopt-api-db-sync-dump
+      job-command: "DB_SYNCER_PERFORM_UPLOAD=true rails db:data:dump --trace"
+      deploy-env: production
+      render-config-command: "DB_OWNER_AUTH=true DB_SYNCER=true RENDER_JOB=run-job RUN_JOB_CONTAINER_IMAGE=db-syncer ./config/deploy/render"
+      rancher-project-id: ${{ fromJSON(needs.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).staging_rancher_project_id }}
+      registry: ${{ fromJSON(needs.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).container_registry }}
+      vault-registry-credentials-path: secret/data/deploy/common/aws-ecr
+      vault-kubeconfig-path: secret/data/deploy/staging/on-prem-rancher-test-ponderosa-cluster-test-reopt
+      force-run: true
+    secrets:
+      vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
+      vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
