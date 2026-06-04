@@ -17,17 +17,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2      
-      # - name: Decrypt
-      #   env:
-      #     TRANSCRYPT_PASSWORD: ${{ secrets.TRANSCRYPT_PASSWORD }}
-      #   run: ./.github/scripts/decrypt.sh 
-      - name: Make keys.py
-        env:
-          NREL_DEV_API_KEY: ${{ secrets.NREL_DEV_API_KEY }}
-        run: ./.github/scripts/make_keys.py.sh 
+      - uses: actions/checkout@v5
       - name: Build containers
         run: docker compose up -d
+        env:
+          NLR_API_KEY: ${{ secrets.NREL_DEV_API_KEY }}
       - name: Check running containers
         run: docker ps -a
       - name: Wait for julia_api

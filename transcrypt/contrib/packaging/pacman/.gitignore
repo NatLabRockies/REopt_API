@@ -1,6 +1,0 @@
-# ignore everything
-*
-
-# except these files
-!.gitignore
-!PKGBUILD

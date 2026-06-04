@@ -1,4 +1,4 @@
-.git
+.git*
 env/
 *.pyc
 *.rdb
@@ -14,3 +14,6 @@ Jenkinsfile
 werf.yaml
 **/*.dylib
 **/*.dll
+Dockerfile*
+.dockerignore
+/config/deploy

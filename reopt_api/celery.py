@@ -4,48 +4,10 @@ import os
 import logging
 from celery import Celery
 from celery.signals import after_setup_logger
-from keys import *
+from keys_env import *
 
 # set the default Django settings module for the 'celery' program.
-try:
-    env = os.environ['APP_ENV']
-
-    if env == 'internal_c110p':
-        raw_env = 'reopt_api.internal_c110p_settings'
-        redis_host = ':' + dev_redis_password + '@localhost'
-    elif env == 'development':
-        raw_env = 'reopt_api.dev_settings'
-        if os.environ.get('K8S_DEPLOY') is None:
-            redis_host = ':' + dev_redis_password + '@' + dev_database_host
-        else:
-            redis_host = ':' + dev_redis_password + '@' + dev_redis_host
-    elif env == 'staging':
-        raw_env = 'reopt_api.staging_settings'
-        if os.environ.get('K8S_DEPLOY') is None:
-            redis_host = ':' + staging_redis_password + '@' + staging_database_host
-        else:
-            redis_host = ':' + staging_redis_password + '@' + staging_redis_host
-    elif env == 'production':
-        raw_env = 'reopt_api.production_settings'
-        if os.environ.get('K8S_DEPLOY') is None:
-            redis_host = ':' + production_redis_password + '@' + prod_database_host
-        else:
-            redis_host = ':' + production_redis_password + '@' + production_redis_host
-    else:
-        raw_env = 'reopt_api.dev_settings'
-        redis_host = os.environ.get('REDIS_HOST', 'localhost')
-
-except KeyError:
-    """
-    This catch is necessary for running celery from command line when testing/developing locally.
-    APP_ENV is defined in config/deploy/[development, production, staging].rb files for servers.
-    For testing and local development, APP_ENV *can* be defined in .env file (see README.md),
-    which `honcho` or `foreman` loads before running Procfile.
-    """
-    raw_env = 'reopt_api.dev_settings'
-    redis_host = os.environ.get('REDIS_HOST', 'localhost')
-
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', raw_env)
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'reopt_api.settings')
 
 app = Celery('reopt_api')
 
@@ -58,7 +20,11 @@ app = Celery('reopt_api')
 #   should have a `CELERY_` prefix.
 app.config_from_object('django.conf:settings', namespace='CELERY')
 
-app.conf.broker_url = 'redis://' + redis_host + ':6379/0'
+redis_auth = ''
+if redis_password:
+    redis_auth = ':' + redis_password + '@'
+
+app.conf.broker_url = 'redis://' + redis_auth + redis_host + ':6379/0'
 
 # Create separate queues for each server (naming each queue after the server's
 # hostname). Since the worker jobs currently all have to be processes on the

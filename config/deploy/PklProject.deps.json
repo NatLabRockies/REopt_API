@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "resolvedDependencies": {
+    "package://pkg.pkl-lang.org/pkl-k8s/k8s@1": {
+      "type": "remote",
+      "uri": "projectpackage://pkg.pkl-lang.org/pkl-k8s/k8s@1.4.1",
+      "checksums": {
+        "sha256": "0520f82219c074d2f4b69ab9c57a4a1c1d0b3c4acc1e5d12749e72e0d567d9bf"
+      }
+    },
+    "package://github.nrel.gov/TADA/tada-shared-kube@0": {
+      "type": "local",
+      "uri": "projectpackage://github.nrel.gov/TADA/tada-shared-kube@0.1.0",
+      "path": "external/tada-shared-kube"
+    },
+    "package://pkg.pkl-lang.org/pkl-pantry/pkl.experimental.deepToTyped@1": {
+      "type": "remote",
+      "uri": "projectpackage://pkg.pkl-lang.org/pkl-pantry/pkl.experimental.deepToTyped@1.0.1",
+      "checksums": {
+        "sha256": "3a1fce17191cab6bcce6cca3cd86b2d50a3489927678fdffb4551a6afedeac32"
+      }
+    }
+  }
+}

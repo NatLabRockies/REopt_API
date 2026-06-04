@@ -32,10 +32,18 @@ services:
       "celery -A reopt_api worker -l info"
     environment:
       - APP_ENV=local
-      - SQL_HOST=db
-      - SQL_PORT=5432
+      - DB_HOST=db
+      - DB_NAME=reopt
+      - DB_USERNAME=reopt
+      - DB_PASSWORD=reopt
+      - DB_SEARCH_PATH=public
       - REDIS_HOST=redis
+      - REDIS_PASSWORD=
       - JULIA_HOST=host.docker.internal 
+      - NLR_API_KEY
+    env_file:
+      - path: .env
+        required: false
     volumes:
       - .:/opt/reopt
     depends_on:
@@ -50,10 +58,18 @@ services:
       && python manage.py runserver 0.0.0.0:8000"
     environment:
       - APP_ENV=local
-      - SQL_HOST=db
-      - SQL_PORT=5432
+      - DB_HOST=db
+      - DB_NAME=reopt
+      - DB_USERNAME=reopt
+      - DB_PASSWORD=reopt
+      - DB_SEARCH_PATH=public
       - REDIS_HOST=redis
+      - REDIS_PASSWORD=
       - JULIA_HOST=host.docker.internal 
+      - NLR_API_KEY
+    env_file:
+      - path: .env
+        required: false
     depends_on:
       - db
       - redis

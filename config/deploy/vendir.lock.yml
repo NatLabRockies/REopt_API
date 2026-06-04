@@ -1,0 +1,9 @@
+apiVersion: vendir.k14s.io/v1alpha1
+directories:
+- contents:
+  - git:
+      commitTitle: 'Merge pull request #29 from TADA/main...'
+      sha: 2cd9ca01cdf325f2daaa608b8b91c7de4a5d2b8c
+    path: tada-shared-kube
+  path: external
+kind: LockConfig
