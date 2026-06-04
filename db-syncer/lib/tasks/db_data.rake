@@ -9,10 +9,18 @@ namespace :db do
       VaultEnvSecrets.load(env: {"DB_SYNCER" => "true", "APP_ENV" => dump_env})
       dump = DbSyncer::Dump.new(dump_env, upload: ":s3:nrel-tada-reopt-files/private/ci/api/db_data_dump.tar")
 
-      # Exclude all table data by default, since we will only import subsets of
+      # Exclude nearly all table data by default (except we want to include the
+      # django metadata/migration tables), since we will only import subsets of
       # data.
       exclude_data_tables = [
-        "reopt_api.*",
+        "reopt_api.delete_run_uuids",
+        "reopt_api.django_celery*",
+        "reopt_api.future*",
+        "reopt_api.ghp*",
+        "reopt_api.proforma*",
+        "reopt_api.reo*",
+        "reopt_api.resilience*",
+        "reopt_api.summary*",
       ]
 
       # Subset the API run data that we include in the dump so that it's a more
