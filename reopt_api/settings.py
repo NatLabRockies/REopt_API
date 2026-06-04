@@ -4,6 +4,9 @@ import os
 import django
 import rollbar
 import sys
+from django.db import connections
+from django.db.models.signals import pre_migrate
+
 
 """
 Django settings for reopt_api project.
@@ -172,6 +175,15 @@ rollbar.init(**ROLLBAR)
 APPEND_SLASH = False
 TASTYPIE_ALLOW_MISSING_SLASH = True
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+
+# Create the default PostgreSQL schema before any migrations run if it doesn't
+# already exist.
+def create_postgres_schema(sender, **kwargs):
+    using = kwargs.get('using', 'default')
+    connection = connections[using]
+    with connection.cursor() as cursor:
+        cursor.execute(f"CREATE SCHEMA IF NOT EXISTS reopt_api;")
+pre_migrate.connect(create_postgres_schema)
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "reopt_api.settings")
 django.setup()
