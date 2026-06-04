@@ -1,7 +1,10 @@
-source "https://rubygems.org"
+source "https://rubygems.org", cooldown: 7
 
 # Syncing production/staging data back to local environments.
-gem "db-syncer", :require => false, :git => "https://github.nrel.gov/TADA/db-syncer.git", :branch => "main"
+gem "db-syncer", git: "https://github.nrel.gov/TADA/db-syncer.git", branch: "main", require: false
+
+# Database setup tasks.
+gem "rails-sql-tasks-enhancer", git: "https://github.nrel.gov/TADA/rails-sql-tasks-enhancer.git", branch: "main"
 
 # Vault secrets as environment variables for development.
 gem "vault_env_secrets", "~> 2.0.0"

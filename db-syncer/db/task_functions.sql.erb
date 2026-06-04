@@ -1,0 +1,99 @@
+-- Lock to prevent `tuple concurrently updated` errors with parallel ALTER
+-- ROLEs or GRANTs.
+-- https://www.postgresql.org/message-id/E1TLyjV-0008JC-OV@wrigleys.postgresql.org
+CREATE OR REPLACE FUNCTION pg_temp.setup_concurrency_lock()
+RETURNS void
+PARALLEL UNSAFE
+LANGUAGE plpgsql
+AS $$
+  BEGIN
+    <% if Rails.env.test? %>
+      -- This performs a global, cluster-wide lock (since users are shared
+      -- across the cluster).
+      LOCK TABLE pg_catalog.pg_user IN SHARE UPDATE EXCLUSIVE MODE;
+    <% else %>
+      -- AWS RDS doesn't give us permissions to perform the cluster-wide
+      -- pg_catalog lock above, so instead we'll perform an advisory lock
+      -- (using an arbitrary ID that we'll reserve for these types of scripts)
+      -- to at least perform a database-wide lock. This won't necessarily help
+      -- with cluster-wide ROLE updates, but may still help with possibly
+      -- concurrency for database-specific tasks.
+      PERFORM pg_advisory_xact_lock(-999876);
+    <% end %>
+  END;
+$$;
+
+-- Retry queries until they don't lead to a `tuple concurrently updated` error
+-- to help with cluster-wide race conditions.
+--
+-- While the `setup_concurrency_lock` helps prevent some concurrency issues,
+-- we've still observed concurrency errors performing certain SQL queries (ALTER
+-- ROLE and GRANT). This function can be used to execute the SQL and retry until
+-- there are no concurrency conflicts.
+CREATE OR REPLACE FUNCTION pg_temp.tuple_concurrency_retry(sql_query TEXT)
+RETURNS void
+PARALLEL UNSAFE
+LANGUAGE plpgsql
+AS $$
+  BEGIN
+    LOOP
+      BEGIN
+        EXECUTE sql_query;
+        EXIT;
+      EXCEPTION
+      WHEN internal_error THEN
+        IF sqlerrm = 'tuple concurrently updated' THEN
+          RAISE NOTICE 'tuple concurrency error, retrying: %', sqlerrm;
+        ELSE
+          RAISE;
+        END IF;
+      END;
+    END LOOP;
+  END;
+$$;
+
+-- Create or update a database role.
+CREATE FUNCTION pg_temp.upsert_role(role_name TEXT, options TEXT, password TEXT = NULL)
+RETURNS void
+PARALLEL UNSAFE
+LANGUAGE plpgsql
+AS $$
+  BEGIN
+    BEGIN
+      PERFORM pg_temp.tuple_concurrency_retry(format('CREATE ROLE %I WITH %s PASSWORD %L', role_name, options, password));
+    EXCEPTION
+    WHEN duplicate_object THEN
+      PERFORM pg_temp.tuple_concurrency_retry(format('ALTER ROLE %I WITH %s PASSWORD %L', role_name, options, password));
+    END;
+  END;
+$$;
+
+-- Set all resources inside of a schema to be owned by a specific user.
+CREATE OR REPLACE FUNCTION pg_temp.ensure_schema_owner(schema_name TEXT, role_name TEXT)
+RETURNS void
+PARALLEL UNSAFE
+LANGUAGE plpgsql
+AS $$
+  DECLARE
+    r record;
+  BEGIN
+    FOR r IN EXECUTE format('SELECT n.nspname, c.relname FROM pg_catalog.pg_class AS c JOIN pg_catalog.pg_namespace AS n ON c.relnamespace = n.oid WHERE c.relkind = ''r'' AND n.nspname = %L AND pg_get_userbyid(c.relowner) != %L', schema_name, role_name) LOOP
+      EXECUTE format('ALTER TABLE %I.%I OWNER TO %I', r.nspname, r.relname, role_name);
+    END LOOP;
+    FOR r IN EXECUTE format('SELECT n.nspname, c.relname FROM pg_catalog.pg_class AS c JOIN pg_catalog.pg_namespace AS n ON c.relnamespace = n.oid WHERE c.relkind = ''v'' AND n.nspname = %L AND pg_get_userbyid(c.relowner) != %L', schema_name, role_name) LOOP
+      EXECUTE format('ALTER VIEW %I.%I OWNER TO %I', r.nspname, r.relname, role_name);
+    END LOOP;
+    FOR r IN EXECUTE format('SELECT n.nspname, c.relname FROM pg_catalog.pg_class AS c JOIN pg_catalog.pg_namespace AS n ON c.relnamespace = n.oid WHERE c.relkind = ''m'' AND n.nspname = %L AND pg_get_userbyid(c.relowner) != %L', schema_name, role_name) LOOP
+      EXECUTE format('ALTER MATERIALIZED VIEW %I.%I OWNER TO %I', r.nspname, r.relname, role_name);
+    END LOOP;
+    FOR r IN EXECUTE format('SELECT n.nspname, c.relname FROM pg_catalog.pg_class AS c JOIN pg_catalog.pg_namespace AS n ON c.relnamespace = n.oid WHERE c.relkind = ''i'' AND n.nspname = %L AND pg_get_userbyid(c.relowner) != %L', schema_name, role_name) LOOP
+      EXECUTE format('ALTER INDEX %I.%I OWNER TO %I', r.nspname, r.relname, role_name);
+    END LOOP;
+    FOR r IN EXECUTE format('SELECT n.nspname, c.relname FROM pg_catalog.pg_class AS c JOIN pg_catalog.pg_namespace AS n ON c.relnamespace = n.oid WHERE c.relkind = ''S'' AND n.nspname = %L AND pg_get_userbyid(c.relowner) != %L', schema_name, role_name) LOOP
+      EXECUTE format('ALTER SEQUENCE %I.%I OWNER TO %I', r.nspname, r.relname, role_name);
+    END LOOP;
+    FOR r IN EXECUTE format('SELECT p.oid::regprocedure AS function_signature FROM pg_catalog.pg_proc AS p JOIN pg_catalog.pg_namespace AS n ON p.pronamespace = n.oid WHERE n.nspname = %L AND pg_get_userbyid(p.proowner) != %L', schema_name, role_name) LOOP
+      EXECUTE format('ALTER FUNCTION %s OWNER TO %I', r.function_signature, role_name);
+    END LOOP;
+  END;
+$$;

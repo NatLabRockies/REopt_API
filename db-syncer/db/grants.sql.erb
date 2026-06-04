@@ -1,0 +1,10 @@
+CREATE OR REPLACE FUNCTION pg_temp.perform_grants()
+RETURNS void
+PARALLEL UNSAFE
+LANGUAGE plpgsql
+AS $$
+  BEGIN
+    -- Ensure tables, sequences, etc are owned by schema-owning user.
+    PERFORM pg_temp.ensure_schema_owner('reopt_api', 'reopt_api');
+  END;
+$$;

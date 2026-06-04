@@ -1,0 +1,9 @@
+<%= ERB.new(File.read(Rails.root.join("db/grants.sql.erb"))).result %>
+<%= ERB.new(File.read(Rails.root.join("db/task_functions.sql.erb"))).result %>
+
+DO $$
+  BEGIN
+    PERFORM pg_temp.setup_concurrency_lock();
+    PERFORM pg_temp.perform_grants();
+  END;
+$$;
