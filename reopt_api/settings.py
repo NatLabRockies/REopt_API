@@ -99,13 +99,6 @@ DATABASES = {
         'PASSWORD': db_password,
     }
 }
-if 'test' in sys.argv or APP_ENV == 'local':
-    DATABASES['default']['NAME'] = 'reopt'
-    DATABASES['default']['USER'] = 'reopt'
-    DATABASES['default']['PASSWORD'] = 'reopt'
-    DATABASES['default']['OPTIONS'] = {
-        'options': '-c search_path=public'
-    }
 
 
 # Internationalization
