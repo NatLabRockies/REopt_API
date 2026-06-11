@@ -66,14 +66,23 @@ function reopt(req::HTTP.Request)
         delete!(d, "api_key")
     end
 
+    settings = d["Settings"]
+    solver_name = get(settings, "solver_name", "HiGHS")    
+    if solver_name == "Xpress" && !(xpress_installed=="True")
+        solver_name = "HiGHS"
+        @warn "Changing solver_name from Xpress to $solver_name because Xpress is not installed. Next time 
+                Specify Settings.solver_name = 'HiGHS' or 'Cbc' or 'SCIP'"
+    end
+
     # ---- API-only battery heuristic dispatch strategy: "daily_foresight_optimized" ----
     # When ElectricStorage.dispatch_options == "daily_foresight_optimized", first run the MPC rolling-horizon loop to get an SOC profile. 
     # Then set ElectricStorage.fixed_soc_series_fraction = MPC SOC before running the main REopt optimization.
+    # Runs after the Xpress availability check so the resolved solver_name is passed in.
     electric_storage = get(d, "ElectricStorage", Dict())
     if get(electric_storage, "dispatch_options", nothing) == "daily_foresight_optimized"
         try
             @info "Running MPC to obtain daily foresight optimized battery dispatch profile."
-            mpc_results = get_mpc_results(d)
+            mpc_results = get_mpc_results(d; solver_name=solver_name)
             soc = mpc_results["dispatch"]["ElectricStorage"]["soc_series_fraction"]
             d["ElectricStorage"]["fixed_soc_series_fraction"] = soc
             d["ElectricStorage"]["dispatch_options"] = "custom"
@@ -86,13 +95,7 @@ function reopt(req::HTTP.Request)
         end
     end
 
-    settings = d["Settings"]
-    solver_name = get(settings, "solver_name", "HiGHS")    
-    if solver_name == "Xpress" && !(xpress_installed=="True")
-        solver_name = "HiGHS"
-        @warn "Changing solver_name from Xpress to $solver_name because Xpress is not installed. Next time 
-                Specify Settings.solver_name = 'HiGHS' or 'Cbc' or 'SCIP'"
-    end
+    #TODO: What timeout and optimality tolerance should MPC use?
 	timeout_seconds = pop!(settings, "timeout_seconds")
 	optimality_tolerance = pop!(settings, "optimality_tolerance")
     solver_attributes = SolverAttributes(timeout_seconds, optimality_tolerance)    
@@ -844,7 +847,14 @@ function mpc(req::HTTP.Request)
             ENV["NREL_DEVELOPER_API_KEY"] = test_nrel_developer_api_key
             delete!(d, "api_key")
         end
-        results = get_mpc_results(d)
+        settings = get(d, "Settings", Dict())
+        solver_name = get(settings, "solver_name", "HiGHS")
+        if solver_name == "Xpress" && !(xpress_installed=="True")
+            solver_name = "HiGHS"
+            @warn "Changing solver_name from Xpress to $solver_name because Xpress is not installed. 
+                   Next time specify Settings.solver_name = 'HiGHS' or 'Cbc' or 'SCIP'."
+        end
+        results = get_mpc_results(d; solver_name=solver_name)
     catch e
         @error "MPC failed" exception=(e, catch_backtrace())
         error_response["error"] = sprint(showerror, e)
