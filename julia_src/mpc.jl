@@ -193,7 +193,7 @@ function get_technology_sizes!(d::Dict)
 
     # Delete inputs specific to the heuristic battery dispatch run
     if haskey(sizing_post, "ElectricStorage")
-        delete!(sizing_post["ElectricStorage"], "dispatch_options")
+        delete!(sizing_post["ElectricStorage"], "dispatch_strategy")
         delete!(sizing_post["ElectricStorage"], "fixed_soc_series_fraction")
     end
 
@@ -219,6 +219,7 @@ function get_technology_sizes!(d::Dict)
     batt_kw  = Float64(get(get(sizing_results, "ElectricStorage", Dict()), "size_kw", 0.0))
     batt_kwh = Float64(get(get(sizing_results, "ElectricStorage", Dict()), "size_kwh", 0.0))
 
+    # TODO: If no battery is sized, just return the optimal REopt result
     if batt_kw <= 0.0 || batt_kwh <= 0.0
         error("MPC: Optimal REopt sizing does not include ElectricStorage (size_kw=$(batt_kw), size_kwh=$(batt_kwh)). " *
               "The daily_foresight_optimized dispatch option requires a non-zero battery size. " *
@@ -283,7 +284,9 @@ function get_mpc_results(d::Dict; solver_name::String="HiGHS")::Dict
         loads_kw = Float64.(electric_load["loads_kw"])
     else
         loads_kw = generate_loads_kw(d, time_steps_per_hour)
-        electric_load["loads_kw"] = loads_kw
+
+        # Previously caching to save an extra CRB call but loads_kw conflicts with other load inputs
+        # electric_load["loads_kw"] = loads_kw
     end
 
     # Check data series lengths 

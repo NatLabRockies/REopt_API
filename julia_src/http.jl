@@ -74,18 +74,19 @@ function reopt(req::HTTP.Request)
                 Specify Settings.solver_name = 'HiGHS' or 'Cbc' or 'SCIP'"
     end
 
+    @info "HERE1"
     # ---- API-only battery heuristic dispatch strategy: "daily_foresight_optimized" ----
-    # When ElectricStorage.dispatch_options == "daily_foresight_optimized", first run the MPC rolling-horizon loop to get an SOC profile. 
+    # When ElectricStorage.dispatch_strategy == "daily_foresight_optimized", first run the MPC rolling-horizon loop to get an SOC profile. 
     # Then set ElectricStorage.fixed_soc_series_fraction = MPC SOC before running the main REopt optimization.
     # Runs after the Xpress availability check so the resolved solver_name is passed in.
     electric_storage = get(d, "ElectricStorage", Dict())
-    if get(electric_storage, "dispatch_options", nothing) == "daily_foresight_optimized"
+    if get(electric_storage, "dispatch_strategy", nothing) == "daily_foresight_optimized"
         try
             @info "Running MPC to obtain daily foresight optimized battery dispatch profile."
             mpc_results = get_mpc_results(d; solver_name=solver_name)
-            soc = mpc_results["dispatch"]["ElectricStorage"]["soc_series_fraction"]
+            soc = mpc_results["ElectricStorage"]["soc_series_fraction"]
             d["ElectricStorage"]["fixed_soc_series_fraction"] = soc
-            d["ElectricStorage"]["dispatch_options"] = "custom"
+            d["ElectricStorage"]["dispatch_strategy"] = "custom_soc"
         catch e
             @error "MPC pre-solve failed" exception=(e, catch_backtrace())
             return HTTP.Response(500, JSON.json(Dict(
