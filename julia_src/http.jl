@@ -74,7 +74,6 @@ function reopt(req::HTTP.Request)
                 Specify Settings.solver_name = 'HiGHS' or 'Cbc' or 'SCIP'"
     end
 
-    @info "HERE1"
     # ---- API-only battery heuristic dispatch strategy: "daily_foresight_optimized" ----
     # When ElectricStorage.dispatch_strategy == "daily_foresight_optimized", first run the MPC rolling-horizon loop to get an SOC profile. 
     # Then set ElectricStorage.fixed_soc_series_fraction = MPC SOC before running the main REopt optimization.
