@@ -76,16 +76,22 @@ function reopt(req::HTTP.Request)
 
     # ---- API-only battery heuristic dispatch strategy: "daily_foresight_optimized" ----
     # When ElectricStorage.dispatch_strategy == "daily_foresight_optimized", first run the MPC rolling-horizon loop to get an SOC profile. 
-    # Then set ElectricStorage.fixed_soc_series_fraction = MPC SOC before running the main REopt optimization.
-    # Runs after the Xpress availability check so the resolved solver_name is passed in.
+    # Then set ElectricStorage.fixed_soc_series_fraction = MPC SOC before running the main REopt optimization. If the user does not 
+    # specify a fixed PV/battery size, optimally size the technologies using REopt (skip MPC dispatch if optimal battery size is 0).
     electric_storage = get(d, "ElectricStorage", Dict())
     if get(electric_storage, "dispatch_strategy", nothing) == "daily_foresight_optimized"
         try
             @info "Running MPC to obtain daily foresight optimized battery dispatch profile."
             mpc_results = get_mpc_results(d; solver_name=solver_name)
-            soc = mpc_results["ElectricStorage"]["soc_series_fraction"]
-            d["ElectricStorage"]["fixed_soc_series_fraction"] = soc
-            d["ElectricStorage"]["dispatch_strategy"] = "custom_soc"
+            # TODO: Cache sizing run results and avoid a second call to REopt? Are those the same results?
+            if get(mpc_results, "skip_mpc", false) == true
+                @info "Cannot execute daily_foresight_optimized battery dispatch: optimal battery size is 0."
+                delete!(d["ElectricStorage"], "dispatch_strategy")
+            else
+                soc = mpc_results["ElectricStorage"]["soc_series_fraction"]
+                d["ElectricStorage"]["fixed_soc_series_fraction"] = soc
+                d["ElectricStorage"]["dispatch_strategy"] = "custom_soc"
+            end
         catch e
             @error "MPC pre-solve failed" exception=(e, catch_backtrace())
             return HTTP.Response(500, JSON.json(Dict(

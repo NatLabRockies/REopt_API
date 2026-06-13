@@ -185,7 +185,7 @@ function get_technology_sizes!(d::Dict)
         batt_kw  = Float64(batt["min_kw"])
         batt_kwh = Float64(batt["min_kwh"])
         @info "MPC: fixed technology sizes entered, PV = $(pv_kw) kW, battery = $(batt_kw) kW / $(batt_kwh) kWh."
-        return (pv_kw = pv_kw, batt_kw = batt_kw, batt_kwh = batt_kwh)
+        return (pv_kw = pv_kw, batt_kw = batt_kw, batt_kwh = batt_kwh, skip_mpc = false)
     end
 
     @info "MPC: PV and/or ElectricStorage sizes are not specified — running REopt sizing first."
@@ -197,34 +197,45 @@ function get_technology_sizes!(d::Dict)
         delete!(sizing_post["ElectricStorage"], "fixed_soc_series_fraction")
     end
 
-    settings = get!(sizing_post, "Settings", Dict())
-    settings["run_bau"] = false
+    # TODO: Avoid redefining defaults here?
+    settings = get(sizing_post, "Settings", Dict())
+    sizing_solver_name = get(settings, "solver_name", "HiGHS")
+    sizing_timeout     = Float64(get(settings, "timeout_seconds", 420))
+    sizing_opt_tol     = Float64(get(settings, "optimality_tolerance", 0.001))
 
-    # TODO: Okay to hard code defaults here? solver_name check is redundant if function is only called from get_mpc_results
-    settings["solver_name"] = get(settings, "solver_name", "HiGHS")
-    settings["timeout_seconds"] = get(settings, "timeout_seconds", 420)
-    settings["optimality_tolerance"] = get(settings, "optimality_tolerance", 0.001)
+    solver_attributes = SolverAttributes(sizing_timeout, sizing_opt_tol)
+    m = get_solver_model(get_solver_model_type(sizing_solver_name), solver_attributes)
 
-    solver_attributes = SolverAttributes(settings["timeout_seconds"], settings["optimality_tolerance"])
-    m = get_solver_model(get_solver_model_type(settings["solver_name"]), solver_attributes)
+    # Delete Settings inputs specific to the API
+    api_only_settings_keys = ("timeout_seconds", "optimality_tolerance", "run_bau")
+    if haskey(sizing_post, "Settings")
+        for k in api_only_settings_keys
+            delete!(sizing_post["Settings"], k)
+        end
+        if isempty(sizing_post["Settings"])
+            delete!(sizing_post, "Settings")
+        end
+    end
 
     model_inputs = reoptjl.REoptInputs(sizing_post)
     sizing_results = reoptjl.run_reopt(m, model_inputs)
 
     if get(sizing_results, "status", "") != "optimal"
-        error("MPC sizing pre-step did not solve (status = $(get(sizing_results, "status", "unknown"))).")
+        status = get(sizing_results, "status", "unknown")
+        msgs = get(sizing_results, "Messages", Dict())
+        errs = get(msgs, "errors", [])
+        warns = get(msgs, "warnings", [])
+        error("MPC sizing pre-step did not solve (status = $(status)). " *
+              "REopt errors: $(errs). REopt warnings: $(warns).")
     end
 
     pv_kw    = Float64(get(get(sizing_results, "PV", Dict()), "size_kw", 0.0))
     batt_kw  = Float64(get(get(sizing_results, "ElectricStorage", Dict()), "size_kw", 0.0))
     batt_kwh = Float64(get(get(sizing_results, "ElectricStorage", Dict()), "size_kwh", 0.0))
 
-    # TODO: If no battery is sized, just return the optimal REopt result
+    # Skip the MPC loop if no battery is sized
     if batt_kw <= 0.0 || batt_kwh <= 0.0
-        error("MPC: Optimal REopt sizing does not include ElectricStorage (size_kw=$(batt_kw), size_kwh=$(batt_kwh)). " *
-              "The daily_foresight_optimized dispatch option requires a non-zero battery size. " *
-              "Set ElectricStorage.min_kw == ElectricStorage.max_kw and " *
-              "ElectricStorage.min_kwh == ElectricStorage.max_kwh to fix sizes manually.")
+        return (pv_kw = pv_kw, batt_kw = 0.0, batt_kwh = 0.0, skip_mpc = true)
     end
 
     pv["min_kw"]    = pv_kw
@@ -235,7 +246,7 @@ function get_technology_sizes!(d::Dict)
     batt["max_kwh"] = batt_kwh
 
     @info "MPC: REopt sizing solved with PV = $(pv_kw) kW and battery = $(batt_kw) kW / $(batt_kwh) kWh."
-    return (pv_kw = pv_kw, batt_kw = batt_kw, batt_kwh = batt_kwh)
+    return (pv_kw = pv_kw, batt_kw = batt_kw, batt_kwh = batt_kwh, skip_mpc = false)
 end
 
 function get_mpc_results(d::Dict; solver_name::String="HiGHS")::Dict
@@ -297,6 +308,12 @@ function get_mpc_results(d::Dict; solver_name::String="HiGHS")::Dict
 
     # MPC requires fixed PV and battery sizes. If not provided, call REopt first in a sizing run.
     technology_sizes = get_technology_sizes!(d)
+
+    # Skip MPC if no battery is optimally sized
+    if technology_sizes.skip_mpc
+        return Dict("skip_mpc" => true)
+    end
+
     pv_kw    = technology_sizes.pv_kw
     batt_kw  = technology_sizes.batt_kw
     batt_kwh = technology_sizes.batt_kwh
