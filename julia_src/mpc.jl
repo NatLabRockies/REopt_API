@@ -222,6 +222,8 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     horizon             = 24 * time_steps_per_hour
     per_iter_timeout_s  = 30.0
 
+    # TODO: Should MPC handle multiple PVs?
+
     # Process and validate inputs using REoptInputs
     try
         model_inputs = reoptjl.REoptInputs(d)
