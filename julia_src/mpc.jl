@@ -52,12 +52,6 @@ This is called by get_mpc_results only when the user does not provide a custom p
 """
 function generate_pv_production_factors(d::Dict, time_steps_per_hour::Int)
     site = get(d, "Site", Dict())
-    if !haskey(site, "latitude")
-        error("MPC: Site.latitude is required to generate PV.production_factor_series using PVWatts.")
-    end
-    if !haskey(site, "longitude")
-        error("MPC: Site.longitude is required to generate PV.production_factor_series using PVWatts.")
-    end
     lat = Float64(site["latitude"])
     lon = Float64(site["longitude"])
 
