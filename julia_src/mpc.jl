@@ -249,19 +249,60 @@ function get_technology_sizes!(d::Dict)
     return (pv_kw = pv_kw, batt_kw = batt_kw, batt_kwh = batt_kwh, skip_mpc = false)
 end
 
-function get_mpc_results(d::Dict; solver_name::String="HiGHS")::Dict
+function get_mpc_results(d::Dict)::Dict
     """
     Run a full-year rolling-horizon MPC dispatch for PV + ElectricStorage by 
     calling `REopt.run_mpc` once per timestep with a 24-hour look-ahead.
 
     Inputs:
         d::Dict, REopt inputs dictionary 
-        solver_name::String, solver to use ("HiGHS", "Cbc", "SCIP", or "Xpress")
 
-    Returns a Dict with PV and BATT sizes, dispatch time series, and cost metrics
+    Returns a Dict with PV and ElectricStorage sizes, dispatch time series, and cost metrics
     """
-    
+
+    ## Validation on allowable inputs for MPC ##
+    # Error if any techs other than PV and ElectricStorage are provided
+    mpc_allowed_keys = Set(["PV", "ElectricStorage", "ElectricLoad", "ElectricTariff", "ElectricUtility", "Site", "Settings", "Financial"])
+    unsupported_keys = setdiff(keys(d), mpc_allowed_keys)
+    if !isempty(unsupported_keys)
+        error("When using MPC (daily_foresight_optimized dispatch), only PV and ElectricStorage are supported technologies. " *
+              "Unsupported inputs found: $(join(unsupported_keys, ", ")).")
+    end
+
+    # Error if unsupported CO2/renewable-fraction constraints are set
+    _site_input = get(d, "Site", Dict())
+    if !isnothing(get(_site_input, "CO2_emissions_reduction_min_fraction", nothing))
+        error("MPC: Site.CO2_emissions_reduction_min_fraction is not supported in MPC runs.")
+    end
+    if get(_site_input, "include_grid_renewable_fraction_in_RE_constraints", false) == true
+        error("MPC: Site.include_grid_renewable_fraction_in_RE_constraints is not supported in MPC runs.")
+    end
+    if get(_site_input, "include_exported_elec_emissions_in_total", true) == false
+        error("MPC: Site.include_exported_elec_emissions_in_total = false is not supported in MPC runs.")
+    end
+    if get(_site_input, "include_exported_renewable_electricity_in_total", true) == false
+        error("MPC: Site.include_exported_renewable_electricity_in_total = false is not supported in MPC runs.")
+    end
+
+    # TODO: Add warnings for REopt inputs and scenarios that are not modeled in MPC (e.g., coincident peak charges, demand lookback, etc.)
+    @warn "Using MPC to determine dispatch. MPC does not model: tiered electricity rates; rates will be flattened to the first tier."
+
+    # TODO: Test with outage inputs before enabling this warning. 
+    # # Warning for outage inputs (MPC does not model outages)
+    # _utility_input = get(d, "ElectricUtility", Dict())
+    # if any(k -> haskey(_utility_input, k), ("outage_start_time_step", "outage_start_time_steps", "outage_durations"))
+    #     @warn "MPC: Outage inputs detected (outage_start_time_step, outage_start_time_steps, outage_durations). " *
+    #           "MPC does not model outages; these inputs will be ignored."
+    # end
+
+    ## Set up MPC inputs ##
     settings = get!(d, "Settings", Dict())
+    solver_name = get(settings, "solver_name", "HiGHS")
+    if solver_name == "Xpress" && !(xpress_installed=="True")
+        solver_name = "HiGHS"
+        @warn "Changing solver_name from Xpress to $solver_name because Xpress is not installed. 
+                Next time specify Settings.solver_name = 'HiGHS' or 'Cbc' or 'SCIP'."
+    end
     settings["solver_name"] = solver_name
 
     # TODO: MPC timeout and optimality tolerance

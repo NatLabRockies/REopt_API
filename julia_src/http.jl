@@ -75,9 +75,9 @@ function reopt(req::HTTP.Request)
     end
 
     # ---- API-only battery heuristic dispatch strategy: "daily_foresight_optimized" ----
-    # When ElectricStorage.dispatch_strategy == "daily_foresight_optimized", first run the MPC rolling-horizon loop to get an SOC profile. 
-    # Then set ElectricStorage.fixed_soc_series_fraction = MPC SOC before running the main REopt optimization. If the user does not 
-    # specify a fixed PV/battery size, optimally size the technologies using REopt (skip MPC dispatch if optimal battery size is 0).
+    # When ElectricStorage.dispatch_strategy == "daily_foresight_optimized", if needed, first run REopt to get optimal sizing of PV and battery.
+    # Then run the MPC rolling-horizon loop to get a SOC profile (skip MPC dispatch if optimal battery size is 0).
+    # Then set ElectricStorage.fixed_soc_series_fraction = MPC SOC before running the main REopt optimization.  
     electric_storage = get(d, "ElectricStorage", Dict())
     if get(electric_storage, "dispatch_strategy", nothing) == "daily_foresight_optimized"
         try
@@ -85,8 +85,8 @@ function reopt(req::HTTP.Request)
             mpc_results = get_mpc_results(d; solver_name=solver_name)
             # TODO: Cache sizing run results and avoid a second call to REopt? Are those the same results?
             if get(mpc_results, "skip_mpc", false) == true
-                @info "Cannot execute daily_foresight_optimized battery dispatch: optimal battery size is 0."
-                delete!(d["ElectricStorage"], "dispatch_strategy")
+                @info "Cannot execute daily_foresight_optimized battery dispatch because optimal battery size is 0. Setting dispatch strategy to 'optimized'."
+                d["ElectricStorage"]["dispatch_strategy"] = "optimized"
             else
                 soc = mpc_results["ElectricStorage"]["soc_series_fraction"]
                 d["ElectricStorage"]["fixed_soc_series_fraction"] = soc
@@ -841,7 +841,29 @@ function job_no_xpress(req::HTTP.Request)
     return HTTP.Response(500, JSON.json(error_response))
 end
 
+"""
+    mpc(req::HTTP.Request)
 
+HTTP endpoint for rolling-horizon Model Predictive Control (MPC) dispatch optimization.
+
+This endpoint performs a full-year rolling-horizon MPC dispatch for PV + ElectricStorage systems,
+optimizing daily dispatch using a 24-hour look-ahead window. Runs the MPC dispatch loop via 
+`get_mpc_results` and returns dispatch results and cost metrics as JSON.
+
+Arguments:
+    req::HTTP.Request: REopt inputs dictionary 
+
+Returns JSON dictionary containing:
+    - MPC: Metadata (time_steps_per_hour, horizon)
+    - PV: Size and dispatch series (to load, storage, grid, curtailed)
+    - ElectricStorage: Sizes and state-of-charge series
+    - ElectricUtility: Grid dispatch series and emissions
+    - ElectricLoad: Load profile used
+    - ElectricTariff: Energy and demand costs, peak demands by month/ratchet
+    - status: "optimal"
+    - reopt_version: Version of REopt.jl used
+    
+"""
 function mpc(req::HTTP.Request)
     d = JSON.parse(String(req.body))
     error_response = Dict()
@@ -853,14 +875,8 @@ function mpc(req::HTTP.Request)
             ENV["NREL_DEVELOPER_API_KEY"] = test_nrel_developer_api_key
             delete!(d, "api_key")
         end
-        settings = get(d, "Settings", Dict())
-        solver_name = get(settings, "solver_name", "HiGHS")
-        if solver_name == "Xpress" && !(xpress_installed=="True")
-            solver_name = "HiGHS"
-            @warn "Changing solver_name from Xpress to $solver_name because Xpress is not installed. 
-                   Next time specify Settings.solver_name = 'HiGHS' or 'Cbc' or 'SCIP'."
-        end
-        results = get_mpc_results(d; solver_name=solver_name)
+
+        results = get_mpc_results(d)
     catch e
         @error "MPC failed" exception=(e, catch_backtrace())
         error_response["error"] = sprint(showerror, e)
