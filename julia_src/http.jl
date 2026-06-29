@@ -66,6 +66,14 @@ function reopt(req::HTTP.Request)
         delete!(d, "api_key")
     end
 
+    settings = d["Settings"]
+    solver_name = get(settings, "solver_name", "HiGHS")    
+    if solver_name == "Xpress" && !(xpress_installed=="True")
+        solver_name = "HiGHS"
+        @warn "Changing solver_name from Xpress to $solver_name because Xpress is not installed. Next time 
+                Specify Settings.solver_name = 'HiGHS' or 'Cbc' or 'SCIP'"
+    end
+
     # ---- API-only battery heuristic dispatch strategy: "daily_foresight_optimized" ----
     # When ElectricStorage.dispatch_strategy == "daily_foresight_optimized", if needed, first run REopt to get optimal sizing of PV and battery.
     # Then run the MPC rolling-horizon loop to get a SOC profile (skip MPC dispatch if optimal battery size is 0).
@@ -74,7 +82,7 @@ function reopt(req::HTTP.Request)
     if get(electric_storage, "dispatch_strategy", nothing) == "daily_foresight_optimized"
         try
             @info "Running MPC to obtain daily foresight optimized battery dispatch profile."
-            mpc_results = get_mpc_results(d)
+            mpc_results = get_mpc_results(d; solver_name=solver_name)
             # TODO: Cache sizing run results and avoid a second call to REopt? Are those the same results?
             if get(mpc_results, "skip_mpc", false) == true
                 @info "Cannot execute daily_foresight_optimized battery dispatch because optimal battery size is 0. Setting dispatch strategy to 'optimized'."
@@ -846,7 +854,7 @@ Arguments:
     req::HTTP.Request: REopt inputs dictionary 
 
 Returns JSON dictionary containing:
-    - MPC: Metadata (time_steps_per_hour, horizon)
+    - MPC: Metadata (time_steps_per_hour, horizon_time_steps)
     - PV: Size and dispatch series (to load, storage, grid, curtailed)
     - ElectricStorage: Sizes and state-of-charge series
     - ElectricUtility: Grid dispatch series and emissions
@@ -868,7 +876,15 @@ function mpc(req::HTTP.Request)
             delete!(d, "api_key")
         end
 
-        results = get_mpc_results(d)
+        settings = d["Settings"]
+        solver_name = get(settings, "solver_name", "HiGHS")    
+        if solver_name == "Xpress" && !(xpress_installed=="True")
+            solver_name = "HiGHS"
+            @warn "Changing solver_name from Xpress to $solver_name because Xpress is not installed. Next time 
+                    Specify Settings.solver_name = 'HiGHS' or 'Cbc' or 'SCIP'"
+        end
+
+        results = get_mpc_results(d; solver_name=solver_name)
     catch e
         @error "MPC failed" exception=(e, catch_backtrace())
         error_response["error"] = sprint(showerror, e)

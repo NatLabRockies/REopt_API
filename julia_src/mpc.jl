@@ -43,61 +43,12 @@ function slice_data(arr::AbstractVector, idx::Int, end_idx::Int)
     end
 end
 
-"""
-    check_series_length(name, series, time_steps_per_hour, length_of_data)
-
-Validate that a user-entered time series is of length 8760 * time_steps_per_hour (cannot be a leap year).
-"""
-function check_series_length(name::String, series::AbstractVector, length_of_data::Int)
-    n = length(series)
-    if n == length_of_data 
-        return series
-    end
-    error("MPC: $name length $n != 8760 * time_steps_per_hour ($length_of_data).")
-end
-
-"""
-    get_tariff_inputs(electric_tariff, year, time_steps_per_hour)
-
-Call REopt.ElectricTariff to get energy_rates, monthly_demand_rates, tou_demand_rates, tou_demand_ratchet_time_steps
-MPC does not currently model tiers (tiers are flattened), coincident peak charges, or demand lookback.
-"""
-function get_tariff_inputs(electric_tariff::Dict, year::Union{Int,Nothing}, time_steps_per_hour::Int)
-    
-    # TODO: Are all of these relevant? Any missing inputs? 
-    # TODO: Implement lookback? (demand_lookback_months, demand_lookback_percent, demand_lookback_range) Ignoring coincident peak charges for now
-    # TODO: Need to think through NEM or passing back export values (wholesale_rate, export_rate_beyond_net_metering_limit)
-    tariff_kwargs = (:urdb_label, :urdb_response, :urdb_utility_name,
-                    :urdb_rate_name, :urdb_metadata,
-                    :wholesale_rate, :export_rate_beyond_net_metering_limit,
-                    :monthly_energy_rates, :monthly_demand_rates,
-                    :blended_annual_energy_rate, :blended_annual_demand_rate,
-                    :add_monthly_rates_to_urdb_rate,
-                    :tou_energy_rates_per_kwh, :add_tou_energy_rates_to_urdb_rate,
-                    :demand_lookback_months, :demand_lookback_percent, :demand_lookback_range)
-    kwargs = Dict{Symbol,Any}(Symbol(k) => v for (k, v) in electric_tariff if Symbol(k) in tariff_kwargs)
-
-    # MPC does not currently model tiered rates
-    kwargs[:remove_tiers] = true
-    tariff = reoptjl.ElectricTariff(; year = year, time_steps_per_hour = time_steps_per_hour, kwargs...)
-
-    energy_rates = Float64.(tariff.energy_rates[:, 1])
-    monthly_demand_rates = isempty(tariff.monthly_demand_rates) ?
-                           zeros(Float64, 12) : Float64.(tariff.monthly_demand_rates[:, 1])
-    tou_demand_rates = isempty(tariff.tou_demand_rates) ? Float64[] : Float64.(tariff.tou_demand_rates[:, 1])
-    tou_demand_ratchet_time_steps = [Int.(v) for v in tariff.tou_demand_ratchet_time_steps]
-
-    # TODO: Track lookback variables - demand_lookback_months, demand_lookback_percent, demand_lookback_range?
-    return (energy_rates = energy_rates,
-            monthly_demand_rates = monthly_demand_rates,
-            tou_demand_rates = tou_demand_rates,
-            tou_demand_ratchet_time_steps = tou_demand_ratchet_time_steps)
-end
 
 """
     generate_pv_production_factors(d, time_steps_per_hour)
 
-Generate a PV production factor series using PVWatts by calling REopt.get_production_factor
+Generate a PV production factor series using PVWatts by calling REopt.get_production_factor.
+This is called by get_mpc_results only when the user does not provide a custom production_factor_series.
 """
 function generate_pv_production_factors(d::Dict, time_steps_per_hour::Int)
     site = get(d, "Site", Dict())
@@ -123,44 +74,12 @@ function generate_pv_production_factors(d::Dict, time_steps_per_hour::Int)
 end
 
 """
-    generate_loads_kw(d, time_steps_per_hour)
-
-Generate an electric load profile using DOE Commercial Reference buildings by calling REopt.ElectricLoad 
-"""
-function generate_loads_kw(d::Dict, time_steps_per_hour::Int)
-    site = get(d, "Site", Dict())
-    if !haskey(site, "latitude")
-        error("MPC: Site.latitude is required to generate ElectricLoad.loads_kw using a DOE CRB profile.")
-    end
-    if !haskey(site, "longitude")
-        error("MPC: Site.longitude is required to generate ElectricLoad.loads_kw using a DOE CRB profile.")
-    end
-    lat = Float64(site["latitude"])
-    lon = Float64(site["longitude"])
-
-    @info "MPC: ElectricLoad.loads_kw not provided; generating via REopt.jl ElectricLoad (lat=$(lat), lon=$(lon))."
-
-    electric_load = get(d, "ElectricLoad", Dict())
-
-    # TODO: Double check this list for relevance/missing inputs
-    load_kwargs = (:normalize_and_scale_load_profile_input,
-                    :path_to_csv, :doe_reference_name,
-                    :blended_doe_reference_names, :blended_doe_reference_percents,
-                    :year, :city, :annual_kwh, :monthly_totals_kwh,
-                    :monthly_peaks_kw, :loads_kw_is_net)
-    kwargs = Dict{Symbol,Any}(Symbol(k) => v for (k, v) in electric_load if Symbol(k) in load_kwargs)
-    load = reoptjl.ElectricLoad(; latitude = lat, longitude = lon,
-                                         time_steps_per_hour = time_steps_per_hour, kwargs...)
-    return Vector{Float64}(load.loads_kw)
-end
-
-"""
     get_technology_sizes!(d)
 
 Determine PV and ElectricStorage sizes for the MPC loop. If min_kw != max_kw and/or min_kwh != max_kwh,
 call REopt to size technologies. User input battery sizes must also be greater than zero.
 """
-function get_technology_sizes!(d::Dict)
+function get_technology_sizes!(d::Dict; solver_name::String="HiGHS")
     pv   = get!(d, "PV", Dict())
     batt = get!(d, "ElectricStorage", Dict())
 
@@ -176,6 +95,7 @@ function get_technology_sizes!(d::Dict)
               "to run the daily_foresight_optimized dispatch option.")
     end
 
+    # Check if both PV and BESS sizes fixed
     pv_fixed   = is_fixed(pv,   "min_kw",  "max_kw")
     batt_fixed = is_fixed(batt, "min_kw",  "max_kw") &&
                  is_fixed(batt, "min_kwh", "max_kwh")
@@ -184,7 +104,6 @@ function get_technology_sizes!(d::Dict)
         pv_kw    = Float64(pv["min_kw"])
         batt_kw  = Float64(batt["min_kw"])
         batt_kwh = Float64(batt["min_kwh"])
-        @info "MPC: fixed technology sizes entered, PV = $(pv_kw) kW, battery = $(batt_kw) kW / $(batt_kwh) kWh."
         return (pv_kw = pv_kw, batt_kw = batt_kw, batt_kwh = batt_kwh, skip_mpc = false)
     end
 
@@ -197,25 +116,15 @@ function get_technology_sizes!(d::Dict)
         delete!(sizing_post["ElectricStorage"], "fixed_soc_series_fraction")
     end
 
-    # TODO: Avoid redefining defaults here?
+    # TODO: Should we "remove tiers" here for sizing or allow for optimizing with tiers? 
+
     settings = get(sizing_post, "Settings", Dict())
-    sizing_solver_name = get(settings, "solver_name", "HiGHS")
-    sizing_timeout     = Float64(get(settings, "timeout_seconds", 420))
-    sizing_opt_tol     = Float64(get(settings, "optimality_tolerance", 0.001))
-
-    solver_attributes = SolverAttributes(sizing_timeout, sizing_opt_tol)
-    m = get_solver_model(get_solver_model_type(sizing_solver_name), solver_attributes)
-
-    # Delete Settings inputs specific to the API
-    api_only_settings_keys = ("timeout_seconds", "optimality_tolerance", "run_bau")
-    if haskey(sizing_post, "Settings")
-        for k in api_only_settings_keys
-            delete!(sizing_post["Settings"], k)
-        end
-        if isempty(sizing_post["Settings"])
-            delete!(sizing_post, "Settings")
-        end
-    end
+    delete!(settings, "run_bau")  # Remove run_bau from sizing run
+    timeout_seconds = pop!(settings, "timeout_seconds", 420)
+	optimality_tolerance = pop!(settings, "optimality_tolerance", 0.001)
+    solver_attributes = SolverAttributes(timeout_seconds, optimality_tolerance)
+    
+    m = get_solver_model(get_solver_model_type(solver_name), solver_attributes)
 
     model_inputs = reoptjl.REoptInputs(sizing_post)
     sizing_results = reoptjl.run_reopt(m, model_inputs)
@@ -249,15 +158,24 @@ function get_technology_sizes!(d::Dict)
     return (pv_kw = pv_kw, batt_kw = batt_kw, batt_kwh = batt_kwh, skip_mpc = false)
 end
 
-function get_mpc_results(d::Dict)::Dict
+function get_mpc_results(d::Dict; solver_name::String="HiGHS")::Dict
     """
     Run a full-year rolling-horizon MPC dispatch for PV + ElectricStorage by 
     calling `REopt.run_mpc` once per timestep with a 24-hour look-ahead.
 
     Inputs:
-        d::Dict, REopt inputs dictionary 
+        d::Dict, REopt inputs dictionary
 
-    Returns a Dict with PV and ElectricStorage sizes, dispatch time series, and cost metrics
+    Returns JSON dictionary containing:
+    - MPC: Metadata (time_steps_per_hour, horizon_time_steps)
+    - PV: Size and dispatch series (to load, storage, grid, curtailed)
+    - ElectricStorage: Sizes and state-of-charge series
+    - ElectricUtility: Grid dispatch series and emissions
+    - ElectricLoad: Load profile used
+    - ElectricTariff: Energy and demand costs, peak demands by month/ratchet
+    - status: "optimal"
+    - reopt_version: Version of REopt.jl used
+
     """
 
     ## Validation on allowable inputs for MPC ##
@@ -297,12 +215,6 @@ function get_mpc_results(d::Dict)::Dict
 
     ## Set up MPC inputs ##
     settings = get!(d, "Settings", Dict())
-    solver_name = get(settings, "solver_name", "HiGHS")
-    if solver_name == "Xpress" && !(xpress_installed=="True")
-        solver_name = "HiGHS"
-        @warn "Changing solver_name from Xpress to $solver_name because Xpress is not installed. 
-                Next time specify Settings.solver_name = 'HiGHS' or 'Cbc' or 'SCIP'."
-    end
     settings["solver_name"] = solver_name
 
     # TODO: MPC timeout and optimality tolerance
@@ -314,38 +226,10 @@ function get_mpc_results(d::Dict)::Dict
     horizon             = 24 * time_steps_per_hour
     per_iter_timeout_s  = 30.0
 
-    # TODO: Should MPC handle multiple PVs?
-    pv               = get!(d, "PV",              Dict())
-    electric_storage = get!(d, "ElectricStorage", Dict())
-    electric_load    = get!(d, "ElectricLoad",    Dict())
-    electric_tariff  = get(d,  "ElectricTariff",  Dict())
-    electric_utility = get(d,  "ElectricUtility", Dict())
-
-    # Read timeseries PV production factors or generate using PVWatts, save generated values to reduce PVWatts calls
-    if haskey(pv, "production_factor_series") && !isempty(pv["production_factor_series"])
-        pv_prod_factor = Float64.(pv["production_factor_series"])
-    else
-        # TODO: These production factors don't consider degradation, problem? 
-        # Does MPCPV need a degradation input to calculate the levelization factor used in the optimization?
-        pv_prod_factor = generate_pv_production_factors(d, time_steps_per_hour)
-        pv["production_factor_series"] = pv_prod_factor
-    end
-
-    # Read timeseries electric load inputs or generate using CRBs
-    if haskey(electric_load, "loads_kw") && !isempty(electric_load["loads_kw"])
-        loads_kw = Float64.(electric_load["loads_kw"])
-    else
-        loads_kw = generate_loads_kw(d, time_steps_per_hour)
-
-        # Previously caching to save an extra CRB call but loads_kw conflicts with other load inputs
-        # electric_load["loads_kw"] = loads_kw
-    end
-
-    # Check data series lengths 
-    # TODO: Do API inputs validation when calling the MPC endpoint directly? 
-    # Should we even have an MPC endpoint? 
-    pv_prod_factor = check_series_length("PV.production_factor_series", pv_prod_factor, length_of_data)
-    loads_kw = check_series_length("ElectricLoad.loads_kw", loads_kw, length_of_data)
+    # Call REoptInputs once upfront to process and validate inputs
+    # This handles: load profile generation, tariff processing (including tier removal), emissions defaults, storage efficiency defaults
+    i = reoptjl.REoptInputs(d)
+    s = i.s  # Access the processed Scenario struct
 
     # MPC requires fixed PV and battery sizes. If not provided, call REopt first in a sizing run.
     technology_sizes = get_technology_sizes!(d)
@@ -355,41 +239,54 @@ function get_mpc_results(d::Dict)::Dict
         return Dict("skip_mpc" => true)
     end
 
+    # Note: REoptInputs does not provide PV production factors if user doesn't specify custom values
+    if !isempty(s.pvs[1].production_factor_series)
+        pv_prod_factor = Float64.(s.pvs[1].production_factor_series)
+    else
+        # TODO: These production factors don't consider degradation, problem? 
+        # Does MPCPV need a degradation input to calculate the levelization factor used in the optimization?
+        pv_prod_factor = generate_pv_production_factors(d, time_steps_per_hour)
+    end
+    
+    loads_kw = Float64.(s.electric_load.loads_kw)
+    
+    # Extract tariff inputs relevant to MPC (use first tier only if tiered rates)
+    # TODO: Are all of these relevant? Any missing inputs? 
+    # TODO: Implement lookback? (demand_lookback_months, demand_lookback_percent, demand_lookback_range) Ignoring coincident peak charges for now
+    # TODO: Need to think through NEM or passing back export values (wholesale_rate, export_rate_beyond_net_metering_limit)
+    # TODO: Track lookback variables - demand_lookback_months, demand_lookback_percent, demand_lookback_range?
+    energy_rates = Float64.(s.electric_tariff.energy_rates[:, 1])
+    monthly_demand_rates = isempty(s.electric_tariff.monthly_demand_rates) ?
+                           zeros(Float64, 12) : Float64.(s.electric_tariff.monthly_demand_rates[:, 1])
+    tou_demand_rates = isempty(s.electric_tariff.tou_demand_rates) ? Float64[] : Float64.(s.electric_tariff.tou_demand_rates[:, 1])
+    tou_demand_ratchet_time_steps = [Int.(v) for v in s.electric_tariff.tou_demand_ratchet_time_steps]
+
+    # Extract storage efficiency and SOC defaults from processed inputs
+    rect_eff  = Float64(s.storage.attr["ElectricStorage"].rectifier_efficiency_fraction)
+    inv_eff   = Float64(s.storage.attr["ElectricStorage"].inverter_efficiency_fraction)
+    int_eff   = Float64(s.storage.attr["ElectricStorage"].internal_efficiency_fraction)
+    charge_eff    = rect_eff * sqrt(int_eff)
+    discharge_eff = inv_eff  * sqrt(int_eff)
+    soc_0   = Float64(s.storage.attr["ElectricStorage"].soc_init_fraction)
+    soc_min = Float64(s.storage.attr["ElectricStorage"].soc_min_fraction)
+
+    # Extract emissions defaults (or use user input if provided)
+    co2_grid_emissions_series = Float64.(s.electric_utility.emissions_factor_series_lb_CO2_per_kwh)
+
+
+
     pv_kw    = technology_sizes.pv_kw
     batt_kw  = technology_sizes.batt_kw
     batt_kwh = technology_sizes.batt_kwh
-
-    # TODO: Should these defaults be read from somewhere so that they don't have to be updated in various places?
-    soc_0  = Float64(get(electric_storage, "soc_init_fraction", 0.5))
-    soc_min   = Float64(get(electric_storage, "soc_min_fraction", 0.2))
-    rect_eff  = Float64(get(electric_storage, "rectifier_efficiency_fraction", 0.96))
-    inv_eff   = Float64(get(electric_storage, "inverter_efficiency_fraction",  0.96))
-    int_eff   = Float64(get(electric_storage, "internal_efficiency_fraction",  0.975))
-    charge_eff    = rect_eff * sqrt(int_eff)
-    discharge_eff = inv_eff  * sqrt(int_eff)
-
-    # Process utility rate
-    year = haskey(electric_load, "year") ? Int(electric_load["year"]) : nothing
-    tariff = get_tariff_inputs(electric_tariff, year, time_steps_per_hour)
-    energy_rates = tariff.energy_rates
-    tou_demand_rates = tariff.tou_demand_rates      
-    tou_demand_ratchet_time_steps = tariff.tou_demand_ratchet_time_steps 
-    monthly_demand_rates = tariff.monthly_demand_rates 
-
-    # TODO: MPC loop cherry picked one specific emissions type - remove or keep and add others?
-    # TODO: If keep, add function to pull defaults? Currently only allowing user upload
-    emissions = haskey(electric_utility, "emissions_factor_series_lb_CO2_per_kwh") ?
-                Float64.(electric_utility["emissions_factor_series_lb_CO2_per_kwh"]) : zeros(Float64, length_of_data)
-    emissions = check_series_length("ElectricUtility.emissions_factor_series_lb_CO2_per_kwh", emissions, length_of_data)
 
     month_starts = get_month_transition_timesteps(time_steps_per_hour)
 
     # ts_to_month = 8760 array specifying which month each timestep falls in (1-12)
     ts_to_month = Vector{Int}(undef, length_of_data)
     for m in 1:12
-        s = month_starts[m]
+        s_idx = month_starts[m]
         e = m < 12 ? month_starts[m+1] - 1 : length_of_data
-        ts_to_month[s:e] .= m
+        ts_to_month[s_idx:e] .= m
     end
 
     # ts_to_ratchet = 8760 array specifying which ratchet each timestep falls in
@@ -472,7 +369,7 @@ function get_mpc_results(d::Dict)::Dict
         current_horizon_pv = slice_data(pv_prod_factor, idx, end_ts)
         current_horizon_load = slice_data(loads_kw, idx, end_ts)
         current_horizon_energy_rates = slice_data(energy_rates, idx, end_ts)
-        current_horizon_emissions = slice_data(emissions, idx, end_ts)
+        current_horizon_emissions = slice_data(co2_grid_emissions_series, idx, end_ts)
 
         # List of length n_tou_ratchets, specifies which ts of the current horizon are in each TOU ratchet 
         # by placing values 1 to horizon into the corresponding element of the array based on ratchet number
@@ -525,7 +422,7 @@ function get_mpc_results(d::Dict)::Dict
         push!(dispatch_series["ElectricUtility"]["electric_to_load_series_kw"], util_to_load)
         push!(dispatch_series["ElectricUtility"]["electric_to_storage_series_kw"], util_to_batt)
         push!(dispatch_series["ElectricUtility"]["emissions_series_lb_CO2"],
-              emissions[idx] * grid_power / time_steps_per_hour)
+              co2_grid_emissions_series[idx] * grid_power / time_steps_per_hour)
         push!(dispatch_series["ElectricLoad"]["load_series_kw"], loads_kw[idx])
 
         # Running energy costs
@@ -558,7 +455,7 @@ function get_mpc_results(d::Dict)::Dict
     return Dict(
         "MPC" => Dict(
             "time_steps_per_hour" => time_steps_per_hour,
-            "horizon" => horizon,
+            "horizon_time_steps" => horizon,
         ),
         "PV" => merge(Dict("size_kw" => pv_kw), dispatch_series["PV"]),
         "ElectricStorage" => merge(Dict("size_kw" => batt_kw, "size_kwh" => batt_kwh), dispatch_series["ElectricStorage"]),
