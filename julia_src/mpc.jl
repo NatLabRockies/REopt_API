@@ -135,6 +135,7 @@ function get_technology_sizes!(d::Dict; solver_name::String="HiGHS")
     pv_kw    = Float64(get(get(sizing_results, "PV", Dict()), "size_kw", 0.0))
     batt_kw  = Float64(get(get(sizing_results, "ElectricStorage", Dict()), "size_kw", 0.0))
     batt_kwh = Float64(get(get(sizing_results, "ElectricStorage", Dict()), "size_kwh", 0.0))
+    pv_production_factor_series = get(get(sizing_results, "PV", Dict()), "production_factor_series", nothing)
 
     # Skip the MPC loop if no battery is sized
     if batt_kw <= 0.0 || batt_kwh <= 0.0
@@ -149,7 +150,7 @@ function get_technology_sizes!(d::Dict; solver_name::String="HiGHS")
     batt["max_kwh"] = batt_kwh
 
     @info "MPC: REopt sizing solved with PV = $(pv_kw) kW and battery = $(batt_kw) kW / $(batt_kwh) kWh."
-    return (pv_kw = pv_kw, batt_kw = batt_kw, batt_kwh = batt_kwh, skip_mpc = false)
+    return (pv_kw = pv_kw, batt_kw = batt_kw, batt_kwh = batt_kwh, skip_mpc = false, pv_production_factor_series = pv_production_factor_series)
 end
 
 function get_mpc_results(d::Dict; solver_name::String="HiGHS")::Dict
@@ -220,10 +221,16 @@ function get_mpc_results(d::Dict; solver_name::String="HiGHS")::Dict
     horizon             = 24 * time_steps_per_hour
     per_iter_timeout_s  = 30.0
 
-    # Call REoptInputs once upfront to process and validate inputs
-    # This handles: load profile generation, tariff processing (including tier removal), emissions defaults, storage efficiency defaults
-    i = reoptjl.REoptInputs(d)
-    s = i.s  # Access the processed Scenario struct
+    # Process and validate inputs using REoptInputs
+    try
+        model_inputs = reoptjl.REoptInputs(d)
+        @info "Successfully processed REopt inputs."
+    catch e
+        @error "Something went wrong during REopt inputs processing!" exception=(e, catch_backtrace())
+        error_response["error"] = sprint(showerror, e)
+    end
+
+    s = model_inputs.s  # Access the processed Scenario struct
 
     # MPC requires fixed PV and battery sizes. If not provided, call REopt first in a sizing run.
     technology_sizes = get_technology_sizes!(d)
