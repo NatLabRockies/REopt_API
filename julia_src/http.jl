@@ -82,7 +82,7 @@ function reopt(req::HTTP.Request)
     if get(electric_storage, "dispatch_strategy", nothing) == "daily_foresight_optimized"
         try
             @info "Running MPC to obtain daily foresight optimized battery dispatch profile."
-            mpc_results = get_mpc_results(d; solver_name=solver_name)
+            mpc_results = get_mpc_results!(d; solver_name=solver_name)
             # TODO: Cache sizing run results and avoid a second call to REopt? Are those the same results?
             if get(mpc_results, "skip_mpc", false) == true
                 @info "Cannot execute daily_foresight_optimized battery dispatch because optimal battery size is 0. Setting dispatch strategy to 'optimized'."
@@ -884,7 +884,7 @@ function mpc(req::HTTP.Request)
                     Specify Settings.solver_name = 'HiGHS' or 'Cbc' or 'SCIP'"
         end
 
-        results = get_mpc_results(d; solver_name=solver_name)
+        results = get_mpc_results!(d; solver_name=solver_name)
     catch e
         @error "MPC failed" exception=(e, catch_backtrace())
         error_response["error"] = sprint(showerror, e)

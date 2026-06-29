@@ -48,7 +48,7 @@ end
     generate_pv_production_factors(d, time_steps_per_hour)
 
 Generate a PV production factor series using PVWatts by calling REopt.get_production_factor.
-This is called by get_mpc_results only when the user does not provide a custom production_factor_series.
+This is called by get_mpc_results only when the user does not provide a custom production_factor_series and REopt is not called for sizing.
 """
 function generate_pv_production_factors(d::Dict, time_steps_per_hour::Int)
     site = get(d, "Site", Dict())
@@ -142,12 +142,9 @@ function get_technology_sizes!(d::Dict; solver_name::String="HiGHS")
         return (pv_kw = pv_kw, batt_kw = 0.0, batt_kwh = 0.0, skip_mpc = true, pv_production_factor_series = pv_production_factor_series)
     end
 
-    println(pv_kw, batt_kw, batt_kwh)
-
     # Fix inputs for final REopt run in http.jl
     pv["min_kw"]    = pv_kw
     pv["max_kw"]    = pv_kw
-    pv["production_factor_series"] = pv_production_factor_series
     batt["min_kw"]  = batt_kw
     batt["max_kw"]  = batt_kw
     batt["min_kwh"] = batt_kwh
@@ -157,7 +154,7 @@ function get_technology_sizes!(d::Dict; solver_name::String="HiGHS")
     return (; pv_kw, batt_kw, batt_kwh, skip_mpc = false, pv_production_factor_series)
 end
 
-function get_mpc_results(d::Dict; solver_name::String="HiGHS")::Dict
+function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     """
     Run a full-year rolling-horizon MPC dispatch for PV + ElectricStorage by 
     calling `REopt.run_mpc` once per timestep with a 24-hour look-ahead.
@@ -244,6 +241,11 @@ function get_mpc_results(d::Dict; solver_name::String="HiGHS")::Dict
         return Dict("skip_mpc" => true)
     end
 
+    # Sizes from user or initial REopt run
+    pv_kw    = technology_sizes.pv_kw
+    batt_kw  = technology_sizes.batt_kw
+    batt_kwh = technology_sizes.batt_kwh
+
     # Note: REoptInputs does not provide PV production factors if user doesn't specify custom values
     if !isempty(s.pvs[1].production_factor_series)
         pv_prod_factor = Float64.(s.pvs[1].production_factor_series)
@@ -254,6 +256,8 @@ function get_mpc_results(d::Dict; solver_name::String="HiGHS")::Dict
         # Does MPCPV need a degradation input to calculate the levelization factor used in the optimization?
         pv_prod_factor = generate_pv_production_factors(d, time_steps_per_hour)
     end
+    # Avoid another PVWatts call in the final REopt run.
+    d["PV"]["production_factor_series"] = pv_prod_factor
     
     loads_kw = Float64.(s.electric_load.loads_kw)
     
@@ -267,6 +271,10 @@ function get_mpc_results(d::Dict; solver_name::String="HiGHS")::Dict
                            zeros(Float64, 12) : Float64.(s.electric_tariff.monthly_demand_rates[:, 1])
     tou_demand_rates = isempty(s.electric_tariff.tou_demand_rates) ? Float64[] : Float64.(s.electric_tariff.tou_demand_rates[:, 1])
     tou_demand_ratchet_time_steps = [Int.(v) for v in s.electric_tariff.tou_demand_ratchet_time_steps]
+    # TODO: Monthly demand has never been tested
+    n_tou_ratchets = length(tou_demand_rates) # Number of TOU ratchets
+    tou_previous_peak_demands = zeros(Float64, n_tou_ratchets) # Tracks past TOU peak demand per ratchet
+    monthly_previous_peak_demands = zeros(Float64, 12) # Tracks past monthly peak demand
 
     # Extract storage efficiency and SOC defaults from processed inputs
     rect_eff  = Float64(s.storage.attr["ElectricStorage"].rectifier_efficiency_fraction)
@@ -279,10 +287,6 @@ function get_mpc_results(d::Dict; solver_name::String="HiGHS")::Dict
 
     # Extract emissions defaults (or use user input if provided)
     co2_grid_emissions_series = Float64.(s.electric_utility.emissions_factor_series_lb_CO2_per_kwh)
-
-    pv_kw    = technology_sizes.pv_kw
-    batt_kw  = technology_sizes.batt_kw
-    batt_kwh = technology_sizes.batt_kwh
 
     month_starts = get_month_transition_timesteps(time_steps_per_hour)
 
@@ -301,11 +305,6 @@ function get_mpc_results(d::Dict; solver_name::String="HiGHS")::Dict
             ts_to_ratchet[g] = t
         end
     end
-
-    # TODO: Monthly demand has never been tested
-    n_tou_ratchets = length(tou_demand_rates) # Number of TOU ratchets
-    tou_previous_peak_demands = zeros(Float64, n_tou_ratchets) # Tracks past TOU peak demand per ratchet
-    monthly_previous_peak_demands = zeros(Float64, 12) # Tracks past monthly peak demand
 
     # Saved dispatch series (first timestep of each MPC loop)
     dispatch_series = Dict(
