@@ -33,7 +33,7 @@ Classify the change according to the following categories:
 ### Changed
 - **ElectricStorage** result key **state_of_health** to **state_of_health_series_fraction**
 
-## Develop - 2026-05-14
+## v3.19.1
 ### Patches
 - URL updates due to NREL > NLR name change
 

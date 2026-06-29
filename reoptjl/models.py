@@ -3767,7 +3767,7 @@ class ElectricStorageInputs(BaseModel, models.Model):
     )
     fixed_soc_series_fraction_tolerance = models.FloatField(
         validators=[
-            MinValueValidator(-1),
+            MinValueValidator(0),
             MaxValueValidator(1)
         ],
         null=True, blank=True,
