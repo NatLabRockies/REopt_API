@@ -139,18 +139,22 @@ function get_technology_sizes!(d::Dict; solver_name::String="HiGHS")
 
     # Skip the MPC loop if no battery is sized
     if batt_kw <= 0.0 || batt_kwh <= 0.0
-        return (pv_kw = pv_kw, batt_kw = 0.0, batt_kwh = 0.0, skip_mpc = true)
+        return (pv_kw = pv_kw, batt_kw = 0.0, batt_kwh = 0.0, skip_mpc = true, pv_production_factor_series = pv_production_factor_series)
     end
 
+    println(pv_kw, batt_kw, batt_kwh)
+
+    # Fix inputs for final REopt run in http.jl
     pv["min_kw"]    = pv_kw
     pv["max_kw"]    = pv_kw
+    pv["production_factor_series"] = pv_production_factor_series
     batt["min_kw"]  = batt_kw
     batt["max_kw"]  = batt_kw
     batt["min_kwh"] = batt_kwh
     batt["max_kwh"] = batt_kwh
 
     @info "MPC: REopt sizing solved with PV = $(pv_kw) kW and battery = $(batt_kw) kW / $(batt_kwh) kWh."
-    return (pv_kw = pv_kw, batt_kw = batt_kw, batt_kwh = batt_kwh, skip_mpc = false, pv_production_factor_series = pv_production_factor_series)
+    return (; pv_kw, batt_kw, batt_kwh, skip_mpc = false, pv_production_factor_series)
 end
 
 function get_mpc_results(d::Dict; solver_name::String="HiGHS")::Dict
@@ -243,6 +247,8 @@ function get_mpc_results(d::Dict; solver_name::String="HiGHS")::Dict
     # Note: REoptInputs does not provide PV production factors if user doesn't specify custom values
     if !isempty(s.pvs[1].production_factor_series)
         pv_prod_factor = Float64.(s.pvs[1].production_factor_series)
+    elseif technology_sizes.pv_production_factor_series !== nothing
+        pv_prod_factor = Float64.(technology_sizes.pv_production_factor_series)
     else
         # TODO: These production factors don't consider degradation, problem? 
         # Does MPCPV need a degradation input to calculate the levelization factor used in the optimization?
@@ -273,8 +279,6 @@ function get_mpc_results(d::Dict; solver_name::String="HiGHS")::Dict
 
     # Extract emissions defaults (or use user input if provided)
     co2_grid_emissions_series = Float64.(s.electric_utility.emissions_factor_series_lb_CO2_per_kwh)
-
-
 
     pv_kw    = technology_sizes.pv_kw
     batt_kw  = technology_sizes.batt_kw

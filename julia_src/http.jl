@@ -77,7 +77,7 @@ function reopt(req::HTTP.Request)
     # ---- API-only battery heuristic dispatch strategy: "daily_foresight_optimized" ----
     # When ElectricStorage.dispatch_strategy == "daily_foresight_optimized", if needed, first run REopt to get optimal sizing of PV and battery.
     # Then run the MPC rolling-horizon loop to get a SOC profile (skip MPC dispatch if optimal battery size is 0).
-    # Then set ElectricStorage.fixed_soc_series_fraction = MPC SOC before running the main REopt optimization.  
+    # Then set ElectricStorage.fixed_soc_series_fraction = MPC SOC and fix PV and BESS sizing before running the main REopt optimization.  
     electric_storage = get(d, "ElectricStorage", Dict())
     if get(electric_storage, "dispatch_strategy", nothing) == "daily_foresight_optimized"
         try
