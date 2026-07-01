@@ -848,7 +848,7 @@ HTTP endpoint for rolling-horizon Model Predictive Control (MPC) dispatch optimi
 
 This endpoint performs a full-year rolling-horizon MPC dispatch for PV + ElectricStorage systems,
 optimizing daily dispatch using a 24-hour look-ahead window. Runs the MPC dispatch loop via 
-`get_mpc_results` and returns dispatch results and cost metrics as JSON.
+`get_mpc_results!` and returns dispatch results and cost metrics as JSON.
 
 Arguments:
     req::HTTP.Request: REopt inputs dictionary 

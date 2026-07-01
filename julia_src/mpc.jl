@@ -48,7 +48,7 @@ end
     generate_pv_production_factors(d, time_steps_per_hour)
 
 Generate a PV production factor series using PVWatts by calling REopt.get_production_factor.
-This is called by get_mpc_results only when the user does not provide a custom production_factor_series and REopt is not called for sizing.
+This is called by get_mpc_results! only when the user does not provide a custom production_factor_series and REopt is not called for sizing.
 """
 function generate_pv_production_factors(d::Dict, time_steps_per_hour::Int)
     site = get(d, "Site", Dict())
@@ -65,6 +65,23 @@ function generate_pv_production_factors(d::Dict, time_steps_per_hour::Int)
     pv_production_factor_series = reoptjl.get_production_factor(pv_struct, lat, lon;
                                                                 time_steps_per_hour = time_steps_per_hour)
     return Vector{Float64}(pv_production_factor_series)
+end
+
+"""
+    build_mpc_response(status; skip_mpc=false, messages=Dict(), result_dict=Dict())
+
+Build a consistent MPC response envelope with status, version info, and messages.
+Ensures all response paths (success, error, skip) have uniform structure.
+"""
+function build_mpc_response(status::String; skip_mpc=false, messages=Dict(), result_dict=Dict())
+    response = Dict(
+        "status" => status,
+        "reopt_version" => string(pkgversion(reoptjl)),
+        "Messages" => messages,
+        "skip_mpc" => skip_mpc,
+    )
+    # Merge result data if provided (for success case)
+    return merge(response, result_dict)
 end
 
 """
@@ -160,17 +177,21 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     calling `REopt.run_mpc` once per timestep with a 24-hour look-ahead.
 
     Inputs:
-        d::Dict, REopt inputs dictionary
+        d::Dict, REopt inputs dictionary (will be modified in-place to store computed fixed sizes and PV production factors.)
 
     Returns JSON dictionary containing:
+    - status: "optimal", "error", or "skipped"
+    - reopt_version: Version of REopt.jl used
+    - Messages: Dict with optional errors, warnings, or info
+    - skip_mpc: Boolean indicating if MPC was skipped
+    
+    For "optimal" status, also includes:
     - MPC: Metadata (time_steps_per_hour, horizon_time_steps)
     - PV: Size and dispatch series (to load, storage, grid, curtailed)
     - ElectricStorage: Sizes and state-of-charge series
     - ElectricUtility: Grid dispatch series and emissions
     - ElectricLoad: Load profile used
     - ElectricTariff: Energy and demand costs, peak demands by month/ratchet
-    - status: "optimal"
-    - reopt_version: Version of REopt.jl used
 
     """
 
@@ -230,7 +251,10 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
         @info "Successfully processed REopt inputs."
     catch e
         @error "Something went wrong during REopt inputs processing!" exception=(e, catch_backtrace())
-        error_response["error"] = sprint(showerror, e)
+        return build_mpc_response(
+            "error",
+            messages = Dict("errors" => [sprint(showerror, e)])
+        )
     end
 
     s = model_inputs.s  # Access the processed Scenario struct
@@ -240,7 +264,11 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
 
     # Skip MPC if no battery is optimally sized
     if technology_sizes.skip_mpc
-        return Dict("skip_mpc" => true)
+        return build_mpc_response(
+            "skipped",
+            skip_mpc = true,
+            messages = Dict("info" => ["No battery was optimally sized in REopt pre-step; MPC dispatch not needed."])
+        )
     end
 
     # Sizes from user or initial REopt run
@@ -463,24 +491,25 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     tou_demand_cost_total = n_tou_ratchets > 0 ?
                             sum(tou_previous_peak_demands .* tou_demand_rates) : 0.0
 
-    return Dict(
-        "MPC" => Dict(
-            "time_steps_per_hour" => time_steps_per_hour,
-            "horizon_time_steps" => horizon,
-        ),
-        "PV" => merge(Dict("size_kw" => pv_kw), dispatch_series["PV"]),
-        "ElectricStorage" => merge(Dict("size_kw" => batt_kw, "size_kwh" => batt_kwh), dispatch_series["ElectricStorage"]),
-        "ElectricUtility" => dispatch_series["ElectricUtility"],
-        "ElectricLoad" => dispatch_series["ElectricLoad"],
-        "ElectricTariff" => Dict(
-            "total_energy_cost" => total_energy_cost,
-            "energy_cost_series_per_timestep" => energy_cost_series,
-            "total_tou_demand_cost" => tou_demand_cost_total,
-            "total_monthly_demand_cost" => monthly_demand_cost_total,
-            "tou_peaks_by_ratchet_kw" => tou_previous_peak_demands,
-            "monthly_peaks_kw" => monthly_previous_peak_demands,
-        ),
-        "status" => "optimal",
-        "reopt_version" => string(pkgversion(reoptjl)),
+    return build_mpc_response(
+        "optimal",
+        result_dict = Dict(
+            "MPC" => Dict(
+                "time_steps_per_hour" => time_steps_per_hour,
+                "horizon_time_steps" => horizon,
+            ),
+            "PV" => merge(Dict("size_kw" => pv_kw), dispatch_series["PV"]),
+            "ElectricStorage" => merge(Dict("size_kw" => batt_kw, "size_kwh" => batt_kwh), dispatch_series["ElectricStorage"]),
+            "ElectricUtility" => dispatch_series["ElectricUtility"],
+            "ElectricLoad" => dispatch_series["ElectricLoad"],
+            "ElectricTariff" => Dict(
+                "total_energy_cost" => total_energy_cost,
+                "energy_cost_series_per_timestep" => energy_cost_series,
+                "total_tou_demand_cost" => tou_demand_cost_total,
+                "total_monthly_demand_cost" => monthly_demand_cost_total,
+                "tou_peaks_by_ratchet_kw" => tou_previous_peak_demands,
+                "monthly_peaks_kw" => monthly_previous_peak_demands,
+            ),
+        )
     )
 end
