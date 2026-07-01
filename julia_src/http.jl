@@ -8,6 +8,7 @@ DotEnv.load!()
 const test_nrel_developer_api_key = ENV["NREL_DEVELOPER_API_KEY"]
 
 ENV["NREL_DEVELOPER_EMAIL"] = "reopt@nlr.gov"
+include("mpc.jl")
 
 include("os_solvers.jl")
 
@@ -64,6 +65,7 @@ function reopt(req::HTTP.Request)
         ENV["NREL_DEVELOPER_API_KEY"] = test_nrel_developer_api_key
         delete!(d, "api_key")
     end
+
     settings = d["Settings"]
     solver_name = get(settings, "solver_name", "HiGHS")    
     if solver_name == "Xpress" && !(xpress_installed=="True")
@@ -71,6 +73,35 @@ function reopt(req::HTTP.Request)
         @warn "Changing solver_name from Xpress to $solver_name because Xpress is not installed. Next time 
                 Specify Settings.solver_name = 'HiGHS' or 'Cbc' or 'SCIP'"
     end
+
+    # ---- API-only battery heuristic dispatch strategy: "daily_foresight_optimized" ----
+    # When ElectricStorage.dispatch_strategy == "daily_foresight_optimized", if needed, first run REopt to get optimal sizing of PV and battery.
+    # Then run the MPC rolling-horizon loop to get a SOC profile (skip MPC dispatch if optimal battery size is 0).
+    # Then set ElectricStorage.fixed_soc_series_fraction = MPC SOC and fix PV and BESS sizing before running the main REopt optimization.  
+    electric_storage = get(d, "ElectricStorage", Dict())
+    if get(electric_storage, "dispatch_strategy", nothing) == "daily_foresight_optimized"
+        try
+            @info "Running MPC to obtain daily foresight optimized battery dispatch profile."
+            mpc_results = get_mpc_results!(d; solver_name=solver_name)
+            # TODO: Cache sizing run results and avoid a second call to REopt? Are those the same results?
+            if get(mpc_results, "skip_mpc", false) == true
+                @info "Cannot execute daily_foresight_optimized battery dispatch because optimal battery size is 0. Setting dispatch strategy to 'optimized'."
+                d["ElectricStorage"]["dispatch_strategy"] = "optimized"
+            else
+                soc = mpc_results["ElectricStorage"]["soc_series_fraction"]
+                d["ElectricStorage"]["fixed_soc_series_fraction"] = soc
+                d["ElectricStorage"]["dispatch_strategy"] = "custom_soc"
+            end
+        catch e
+            @error "MPC pre-solve failed" exception=(e, catch_backtrace())
+            return HTTP.Response(500, JSON.json(Dict(
+                "error" => "MPC pre-solve failed: " * sprint(showerror, e),
+                "reopt_version" => string(pkgversion(reoptjl)),
+            )))
+        end
+    end
+
+    #TODO: What timeout and optimality tolerance should MPC use?
 	timeout_seconds = pop!(settings, "timeout_seconds")
 	optimality_tolerance = pop!(settings, "optimality_tolerance")
     solver_attributes = SolverAttributes(timeout_seconds, optimality_tolerance)    
@@ -810,6 +841,64 @@ function job_no_xpress(req::HTTP.Request)
     return HTTP.Response(500, JSON.json(error_response))
 end
 
+"""
+    mpc(req::HTTP.Request)
+
+HTTP endpoint for rolling-horizon Model Predictive Control (MPC) dispatch optimization.
+
+This endpoint performs a full-year rolling-horizon MPC dispatch for PV + ElectricStorage systems,
+optimizing daily dispatch using a 24-hour look-ahead window. Runs the MPC dispatch loop via 
+`get_mpc_results!` and returns dispatch results and cost metrics as JSON.
+
+Arguments:
+    req::HTTP.Request: REopt inputs dictionary 
+
+Returns JSON dictionary containing:
+    - MPC: Metadata (time_steps_per_hour, horizon_time_steps)
+    - PV: Size and dispatch series (to load, storage, grid, curtailed)
+    - ElectricStorage: Sizes and state-of-charge series
+    - ElectricUtility: Grid dispatch series and emissions
+    - ElectricLoad: Load profile used
+    - ElectricTariff: Energy and demand costs, peak demands by month/ratchet
+    - status: "optimal"
+    - reopt_version: Version of REopt.jl used
+    
+"""
+function mpc(req::HTTP.Request)
+    d = JSON.parse(String(req.body))
+    error_response = Dict()
+    results = Dict()
+    try
+        if !isempty(get(d, "api_key", ""))
+            ENV["NREL_DEVELOPER_API_KEY"] = pop!(d, "api_key")
+        else
+            ENV["NREL_DEVELOPER_API_KEY"] = test_nrel_developer_api_key
+            delete!(d, "api_key")
+        end
+
+        settings = d["Settings"]
+        solver_name = get(settings, "solver_name", "HiGHS")    
+        if solver_name == "Xpress" && !(xpress_installed=="True")
+            solver_name = "HiGHS"
+            @warn "Changing solver_name from Xpress to $solver_name because Xpress is not installed. Next time 
+                    Specify Settings.solver_name = 'HiGHS' or 'Cbc' or 'SCIP'"
+        end
+
+        results = get_mpc_results!(d; solver_name=solver_name)
+    catch e
+        @error "MPC failed" exception=(e, catch_backtrace())
+        error_response["error"] = sprint(showerror, e)
+        error_response["reopt_version"] = string(pkgversion(reoptjl))
+    end
+    GC.gc()
+    if isempty(error_response)
+        @info "MPC ran successfully."
+        return HTTP.Response(200, JSON.json(results))
+    else
+        return HTTP.Response(500, JSON.json(error_response))
+    end
+end
+
 # define REST endpoints to dispatch to "service" functions
 const ROUTER = HTTP.Router()
 
@@ -820,6 +909,7 @@ else
 end
 HTTP.register!(ROUTER, "POST", "/reopt", reopt)
 HTTP.register!(ROUTER, "POST", "/erp", erp)
+HTTP.register!(ROUTER, "POST", "/mpc", mpc)
 HTTP.register!(ROUTER, "POST", "/ghpghx", ghpghx)
 HTTP.register!(ROUTER, "GET", "/chp_defaults", chp_defaults)
 HTTP.register!(ROUTER, "GET", "/avert_emissions_profile", avert_emissions_profile)
