@@ -68,7 +68,7 @@ function generate_pv_production_factors(d::Dict, time_steps_per_hour::Int)
 end
 
 """
-    get_technology_sizes!(d)
+    get_technology_sizes!(d, solver_name="HiGHS")
 
 Determine PV and ElectricStorage sizes for the MPC loop. If min_kw != max_kw and/or min_kwh != max_kwh,
 call REopt to size technologies. User input battery sizes must also be greater than zero.
@@ -236,7 +236,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     s = model_inputs.s  # Access the processed Scenario struct
 
     # MPC requires fixed PV and battery sizes. If not provided, call REopt first in a sizing run.
-    technology_sizes = get_technology_sizes!(d)
+    technology_sizes = get_technology_sizes!(d, solver_name=solver_name)
 
     # Skip MPC if no battery is optimally sized
     if technology_sizes.skip_mpc
@@ -249,17 +249,22 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     batt_kwh = technology_sizes.batt_kwh
 
     # Note: REoptInputs does not provide PV production factors if user doesn't specify custom values
-    if !isempty(s.pvs[1].production_factor_series)
-        pv_prod_factor = Float64.(s.pvs[1].production_factor_series)
-    elseif technology_sizes.pv_production_factor_series !== nothing
-        pv_prod_factor = Float64.(technology_sizes.pv_production_factor_series)
+    if !isempty(s.pvs) # Get prod factors if PV considered.
+        if !isempty(s.pvs[1].production_factor_series)
+            pv_prod_factor = Float64.(s.pvs[1].production_factor_series)
+        elseif technology_sizes.pv_production_factor_series !== nothing
+            pv_prod_factor = Float64.(technology_sizes.pv_production_factor_series)
+        else
+            # TODO: These production factors don't consider degradation, problem? 
+            # Does MPCPV need a degradation input to calculate the levelization factor used in the optimization?
+            # AF: none of these production factors consider degradation and I don't think it's a problem?
+            pv_prod_factor = generate_pv_production_factors(d, time_steps_per_hour)
+        end
+        # Avoid another PVWatts call in the final REopt run.
+        d["PV"]["production_factor_series"] = pv_prod_factor
     else
-        # TODO: These production factors don't consider degradation, problem? 
-        # Does MPCPV need a degradation input to calculate the levelization factor used in the optimization?
-        pv_prod_factor = generate_pv_production_factors(d, time_steps_per_hour)
+        pv_prod_factor = zeros(Float64, length_of_data)
     end
-    # Avoid another PVWatts call in the final REopt run.
-    d["PV"]["production_factor_series"] = pv_prod_factor
     
     loads_kw = Float64.(s.electric_load.loads_kw)
     
