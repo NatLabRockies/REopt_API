@@ -1,4 +1,4 @@
-﻿using HTTP, JSON, JuMP
+using HTTP, JSON, JuMP
 using HiGHS, Cbc, SCIP
 using GhpGhx
 import REopt as reoptjl  # For REopt.jl, needed because we still have local REopt.jl module for V1/V2
