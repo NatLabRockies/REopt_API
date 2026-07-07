@@ -182,7 +182,23 @@ def create_postgres_schema(sender, **kwargs):
     using = kwargs.get('using', 'default')
     connection = connections[using]
     with connection.cursor() as cursor:
-        cursor.execute(f"CREATE SCHEMA IF NOT EXISTS reopt_api;")
+        # Wrap in extra conditions so it can execute even if user doesn't have
+        # "CREATE" privileges and schema already exists.
+        cursor.execute(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = 'reopt_api') THEN
+                    CREATE SCHEMA IF NOT EXISTS reopt_api;
+                END IF;
+                IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'reopt_api') THEN
+                    ALTER SCHEMA reopt_api OWNER TO reopt_api;
+                END IF;
+            END;
+            $$;
+            """
+        )
+
 pre_migrate.connect(create_postgres_schema)
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "reopt_api.settings")
