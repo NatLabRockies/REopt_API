@@ -85,12 +85,15 @@ function build_mpc_response(status::String; skip_mpc=false, messages=Dict(), res
 end
 
 """
-    get_technology_sizes!(d, solver_name="HiGHS")
+    get_technology_sizes!(d::Dict, model_inputs::reoptjl.REoptInputs, solver_settings::Dict)
 
 Determine PV and ElectricStorage sizes for the MPC loop. If min_kw != max_kw and/or min_kwh != max_kwh,
 call REopt to size technologies. User input battery sizes must also be greater than zero.
+    d is mutated in-place to update PV and ElectricStorage sizes.
+    model_inputs has already been processed to remove inputs not used in REopt.jl
 """
-function get_technology_sizes!(d::Dict; solver_name::String="HiGHS")
+function get_technology_sizes!(d::Dict, model_inputs::reoptjl.REoptInputs, solver_settings::Dict) 
+    # pv and batt are updated in-place from the dictionary `d` and used in the final REopt run
     pv   = get!(d, "PV", Dict())
     batt = get!(d, "ElectricStorage", Dict())
 
@@ -119,25 +122,11 @@ function get_technology_sizes!(d::Dict; solver_name::String="HiGHS")
     end
 
     @info "MPC: PV and/or ElectricStorage sizes are not specified — running REopt sizing first."
-    sizing_post = deepcopy(d)
-
-    # Delete inputs specific to the heuristic battery dispatch run
-    if haskey(sizing_post, "ElectricStorage")
-        delete!(sizing_post["ElectricStorage"], "dispatch_strategy")
-        delete!(sizing_post["ElectricStorage"], "fixed_soc_series_fraction")
-    end
-
     # TODO: Should we "remove tiers" here for sizing or allow for optimizing with tiers? 
 
-    settings = get(sizing_post, "Settings", Dict())
-    delete!(settings, "run_bau")  # Remove run_bau from sizing run
-    timeout_seconds = pop!(settings, "timeout_seconds", 420)
-	optimality_tolerance = pop!(settings, "optimality_tolerance", 0.001)
-    solver_attributes = SolverAttributes(timeout_seconds, optimality_tolerance)
-    
-    m = get_solver_model(get_solver_model_type(solver_name), solver_attributes)
+    m = get_solver_model(get_solver_model_type(solver_settings["solver_name"]), solver_settings["solver_attributes"])
 
-    model_inputs = reoptjl.REoptInputs(sizing_post)
+    # model_inputs = reoptjl.REoptInputs(sizing_post)
     sizing_results = reoptjl.run_reopt(m, model_inputs)
 
     if get(sizing_results, "status", "") != "optimal"
@@ -232,10 +221,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
 
     ## Set up MPC inputs ##
     settings = get!(d, "Settings", Dict())
-    settings["solver_name"] = solver_name
-
-    # TODO: MPC timeout and optimality tolerance
-    optimality_tolerance = Float64(get(settings, "optimality_tolerance", 0.001))
+    settings["solver_name"] = solver_name # TODO: remove?
 
     # TODO: MPC horizons and timeout are currently hard coded
     time_steps_per_hour = Int(get(settings, "time_steps_per_hour", 1))
@@ -244,10 +230,26 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     per_iter_timeout_s  = 30.0
 
     # TODO: Should MPC handle multiple PVs?
+    # TODO: MPC timeout and optimality tolerance
+    # Update sizing_post to remove solver settings and dispatch inputs, to be able to validate inputs using REoptInputs
+    sizing_post = deepcopy(d)
+    settings = get(sizing_post, "Settings", Dict())
+    solver_settings=Dict()
+    delete!(settings, "run_bau")  # Remove run_bau from sizing run
+    solver_settings["timeout_seconds"] = pop!(settings, "timeout_seconds", 420)
+	solver_settings["optimality_tolerance"] = pop!(settings, "optimality_tolerance", 0.001)
+    solver_settings["solver_attributes"] = SolverAttributes(solver_settings["timeout_seconds"], solver_settings["optimality_tolerance"])
+    solver_settings["solver_name"] = solver_name
+    # Delete inputs specific to the heuristic battery dispatch run
+    if haskey(sizing_post, "ElectricStorage")
+        delete!(sizing_post["ElectricStorage"], "dispatch_strategy")
+        delete!(sizing_post["ElectricStorage"], "fixed_soc_series_fraction")
+    end
 
     # Process and validate inputs using REoptInputs
+    model_inputs = nothing
     try
-        model_inputs = reoptjl.REoptInputs(d)
+        model_inputs = reoptjl.REoptInputs(sizing_post)
         @info "Successfully processed REopt inputs."
     catch e
         @error "Something went wrong during REopt inputs processing!" exception=(e, catch_backtrace())
@@ -256,11 +258,10 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
             messages = Dict("errors" => [sprint(showerror, e)])
         )
     end
-
-    s = model_inputs.s  # Access the processed Scenario struct
-
+   
     # MPC requires fixed PV and battery sizes. If not provided, call REopt first in a sizing run.
-    technology_sizes = get_technology_sizes!(d, solver_name=solver_name)
+    technology_sizes = get_technology_sizes!(d, model_inputs, solver_settings)
+    s = model_inputs.s  # Access the processed Scenario struct
 
     # Skip MPC if no battery is optimally sized
     if technology_sizes.skip_mpc
@@ -434,7 +435,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
                               tou_previous_peak_demands, monthly_previous_peak_demands, soc_init_frac)
 
         model = get_solver_model(get_solver_model_type(solver_name),
-                                  SolverAttributes(per_iter_timeout_s, optimality_tolerance))
+                                  SolverAttributes(per_iter_timeout_s, solver_settings["optimality_tolerance"]))
         result = reoptjl.run_mpc(model, post)
 
         # Assume perfect forecast; save first timestep of results as the executed state
