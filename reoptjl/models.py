@@ -3668,6 +3668,16 @@ class ElectricStorageInputs(BaseModel, models.Model):
         primary_key=True
     )
 
+    ELECTRICSTORAGE_DISPATCH_STRATEGY = models.TextChoices('ELECTRICSTORAGE_DISPATCH_STRATEGY', (
+        "optimized",
+        "peak_shaving_look_ahead",
+        "peak_shaving_look_behind",
+        "self_consumption",
+        "backup",
+        "custom_soc",
+        "daily_foresight_optimized"
+    ))
+
     min_kw = models.FloatField(
         default=0,
         validators=[
@@ -3731,8 +3741,14 @@ class ElectricStorageInputs(BaseModel, models.Model):
         blank=True,
         help_text="Battery rectifier efficiency"
     )
+    dispatch_strategy = models.TextField(
+        default=ELECTRICSTORAGE_DISPATCH_STRATEGY.optimized,
+        choices=ELECTRICSTORAGE_DISPATCH_STRATEGY.choices,
+        null=True,
+        blank=True,
+        help_text="Electric storage dispatch strategy can be one of: optimized, peak_shaving_look_ahead, peak_shaving_look_behind, self_consumption, backup, custom_soc, daily_foresight_optimized"
+    )
     soc_min_fraction = models.FloatField(
-        default=0.2,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0)

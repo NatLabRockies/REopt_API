@@ -26,6 +26,11 @@ Classify the change according to the following categories:
     ##### Removed
     ### Patches
 
+## heuristic-dispatch-option
+### Minor udpates
+#### Added
+- Add **ElectricStorage** inputs field **dispatch_options** with heuristic options
+
 ## fixed-soc
 ### Minor udpates
 #### Added

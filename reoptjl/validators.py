@@ -363,6 +363,12 @@ class InputValidator(object):
                 else:
                     self.models["ElectricStorage"].soc_init_fraction = 1.0
             
+            if self.models["ElectricStorage"].__getattribute__("soc_min_fraction") == None:
+                if self.models["ElectricStorage"].dispatch_strategy=="backup":
+                    self.models["ElectricStorage"].soc_min_fraction = 0.8
+                else:
+                    self.models["ElectricStorage"].soc_min_fraction = 0.2
+
             if self.models["ElectricStorage"].__getattribute__("can_grid_charge") == None:
                 if self.models["Settings"].off_grid_flag==False:
                     self.models["ElectricStorage"].can_grid_charge = True

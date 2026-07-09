@@ -167,6 +167,7 @@
         "internal_efficiency_fraction": 0.975,
         "inverter_efficiency_fraction": 0.96,
         "rectifier_efficiency_fraction": 0.96,
+        "dispatch_strategy": "optimized",
         "soc_min_fraction": 0.2,
         "soc_min_applies_during_outages": true,
         "soc_init_fraction": 0.5,
