@@ -3793,6 +3793,24 @@ class ElectricStorageInputs(BaseModel, models.Model):
         blank=True,
         help_text="Flag to set whether the battery can be charged from the grid, or just onsite generation."
     )
+    can_net_meter = models.BooleanField(
+        default=False,
+        blank=True,
+        help_text=("True/False for if technology has option to participate in net metering agreement with utility. "
+                   "Note that a technology can only participate in either net metering or wholesale rates (not both).")
+    )
+    can_wholesale = models.BooleanField(
+        default=False,
+        blank=True,
+        help_text=("True/False for if technology has option to export energy that is compensated at the wholesale_rate. "
+                   "Note that a technology can only participate in either net metering or wholesale rates (not both).")
+    )
+    can_export_beyond_nem_limit = models.BooleanField(
+        default=False,
+        blank=True,
+        help_text=("True/False for if technology can export energy beyond the annual site load (and be compensated for "
+                   "that energy at the export_rate_beyond_net_metering_limit).")
+    )
     installed_cost_per_kw = models.FloatField(
         default=968.0,
         validators=[
@@ -3975,6 +3993,10 @@ class ElectricStorageOutputs(BaseModel, models.Model):
         blank=True, default=list
     )
     storage_to_load_series_kw = ArrayField(
+        models.FloatField(null=True, blank=True),
+        blank=True, default=list
+    )
+    storage_to_grid_series_kw = ArrayField(
         models.FloatField(null=True, blank=True),
         blank=True, default=list
     )
