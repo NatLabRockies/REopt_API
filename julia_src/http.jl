@@ -875,9 +875,8 @@ function mpc(req::HTTP.Request)
             ENV["NREL_DEVELOPER_API_KEY"] = test_nrel_developer_api_key
             delete!(d, "api_key")
         end
-
-        settings = d["Settings"]
-        solver_name = get(settings, "solver_name", "HiGHS")    
+               
+        solver_name = get(get(d, "Settings", Dict()), "solver_name", "HiGHS")    
         if solver_name == "Xpress" && !(xpress_installed=="True")
             solver_name = "HiGHS"
             @warn "Changing solver_name from Xpress to $solver_name because Xpress is not installed. Next time 

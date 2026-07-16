@@ -118,7 +118,7 @@ function get_technology_sizes!(d::Dict, model_inputs::reoptjl.REoptInputs, solve
         pv_kw    = Float64(pv["min_kw"])
         batt_kw  = Float64(batt["min_kw"])
         batt_kwh = Float64(batt["min_kwh"])
-        return (pv_kw = pv_kw, batt_kw = batt_kw, batt_kwh = batt_kwh, skip_mpc = false)
+        return (pv_kw = pv_kw, batt_kw = batt_kw, batt_kwh = batt_kwh, skip_mpc = false, pv_production_factor_series = nothing)
     end
 
     @info "MPC: PV and/or ElectricStorage sizes are not specified — running REopt sizing first."
@@ -250,7 +250,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     model_inputs = nothing
     try
         model_inputs = reoptjl.REoptInputs(sizing_post)
-        @info "Successfully processed REopt inputs."
+        @info "Successfully processed REopt inputs." 
     catch e
         @error "Something went wrong during REopt inputs processing!" exception=(e, catch_backtrace())
         return build_mpc_response(
@@ -279,7 +279,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
 
     # Note: REoptInputs does not provide PV production factors if user doesn't specify custom values
     if !isempty(s.pvs) # Get prod factors if PV considered.
-        if !isempty(s.pvs[1].production_factor_series)
+        if !isnothing(s.pvs[1].production_factor_series)
             pv_prod_factor = Float64.(s.pvs[1].production_factor_series)
         elseif technology_sizes.pv_production_factor_series !== nothing
             pv_prod_factor = Float64.(technology_sizes.pv_production_factor_series)
@@ -432,7 +432,8 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
 
         post = build_mpc_post(current_horizon_pv, current_horizon_load, current_horizon_energy_rates, 
                               current_horizon_emissions, current_horizon_tou_ts, current_horizon_monthly_ts,
-                              tou_previous_peak_demands, monthly_previous_peak_demands, soc_init_frac)
+                              tou_previous_peak_demands, monthly_previous_peak_demands, soc_init_frac
+                              )
 
         model = get_solver_model(get_solver_model_type(solver_name),
                                   SolverAttributes(per_iter_timeout_s, solver_settings["optimality_tolerance"]))
