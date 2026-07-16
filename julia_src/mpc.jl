@@ -192,6 +192,10 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
         error("When using MPC (daily_foresight_optimized dispatch), only PV and ElectricStorage are supported technologies. " *
               "Unsupported inputs found: $(join(unsupported_keys, ", ")).")
     end
+    # Error if multiple PVs
+    if haskey(d, "PV") && length(d["PV"]) > 1
+        error("MPC: Multiple PV systems are not supported.")
+    end
 
     # Error if unsupported CO2/renewable-fraction constraints are set
     _site_input = get(d, "Site", Dict())
@@ -211,6 +215,8 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     # TODO: Add warnings for REopt inputs and scenarios that are not modeled in MPC (e.g., coincident peak charges, demand lookback, etc.)
     @warn "Using MPC to determine dispatch. MPC does not model: tiered electricity rates; rates will be flattened to the first tier."
 
+    # TODO: Error if rate tariff contains lookbacks. 
+
     # TODO: Test with outage inputs before enabling this warning. 
     # # Warning for outage inputs (MPC does not model outages)
     # _utility_input = get(d, "ElectricUtility", Dict())
@@ -220,24 +226,22 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     # end
 
     ## Set up MPC inputs ##
-    settings = get!(d, "Settings", Dict())
-    settings["solver_name"] = solver_name # TODO: remove?
 
     # TODO: MPC horizons and timeout are currently hard coded
+    settings = get!(d, "Settings", Dict())
     time_steps_per_hour = Int(get(settings, "time_steps_per_hour", 1))
     length_of_data      = 8760 * time_steps_per_hour
     horizon             = 24 * time_steps_per_hour
     per_iter_timeout_s  = 30.0
 
-    # TODO: Should MPC handle multiple PVs?
-    # TODO: MPC timeout and optimality tolerance
+    # TODO: Handle multiple PVs
     # Update sizing_post to remove solver settings and dispatch inputs, to be able to validate inputs using REoptInputs
     sizing_post = deepcopy(d)
     settings = get(sizing_post, "Settings", Dict())
     solver_settings=Dict()
     delete!(settings, "run_bau")  # Remove run_bau from sizing run
-    solver_settings["timeout_seconds"] = pop!(settings, "timeout_seconds", 420)
-	solver_settings["optimality_tolerance"] = pop!(settings, "optimality_tolerance", 0.001)
+    solver_settings["timeout_seconds"] = pop!(settings, "timeout_seconds", 600) # only gets used in sizing run. 
+	solver_settings["optimality_tolerance"] = pop!(settings, "optimality_tolerance", 0.001) # Update to a higher value if solve time becomes an issue
     solver_settings["solver_attributes"] = SolverAttributes(solver_settings["timeout_seconds"], solver_settings["optimality_tolerance"])
     solver_settings["solver_name"] = solver_name
     # Delete inputs specific to the heuristic battery dispatch run
@@ -278,15 +282,13 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     batt_kwh = technology_sizes.batt_kwh
 
     # Note: REoptInputs does not provide PV production factors if user doesn't specify custom values
+    # PV production is NOT levelized in MPC but IS levelized in REopt. This will result in a slight mis-match.
     if !isempty(s.pvs) # Get prod factors if PV considered.
         if !isnothing(s.pvs[1].production_factor_series)
             pv_prod_factor = Float64.(s.pvs[1].production_factor_series)
         elseif technology_sizes.pv_production_factor_series !== nothing
             pv_prod_factor = Float64.(technology_sizes.pv_production_factor_series)
         else
-            # TODO: These production factors don't consider degradation, problem? 
-            # Does MPCPV need a degradation input to calculate the levelization factor used in the optimization?
-            # AF: none of these production factors consider degradation and I don't think it's a problem?
             pv_prod_factor = generate_pv_production_factors(d, time_steps_per_hour)
         end
         # Avoid another PVWatts call in the final REopt run.
@@ -299,9 +301,8 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     
     # Extract tariff inputs relevant to MPC (use first tier only if tiered rates)
     # TODO: Are all of these relevant? Any missing inputs? 
-    # TODO: Implement lookback? (demand_lookback_months, demand_lookback_percent, demand_lookback_range) Ignoring coincident peak charges for now
+    # TODO: Implement lookback (demand_lookback_months, demand_lookback_percent, demand_lookback_range) Ignoring coincident peak charges for now 
     # TODO: Need to think through NEM or passing back export values (wholesale_rate, export_rate_beyond_net_metering_limit)
-    # TODO: Track lookback variables - demand_lookback_months, demand_lookback_percent, demand_lookback_range?
     energy_rates = Float64.(s.electric_tariff.energy_rates[:, 1])
     monthly_demand_rates = isempty(s.electric_tariff.monthly_demand_rates) ?
                            zeros(Float64, 12) : Float64.(s.electric_tariff.monthly_demand_rates[:, 1])

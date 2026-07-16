@@ -101,7 +101,6 @@ function reopt(req::HTTP.Request)
         end
     end
 
-    #TODO: What timeout and optimality tolerance should MPC use?
 	timeout_seconds = pop!(settings, "timeout_seconds")
 	optimality_tolerance = pop!(settings, "optimality_tolerance")
     solver_attributes = SolverAttributes(timeout_seconds, optimality_tolerance)    
