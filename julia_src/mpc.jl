@@ -180,7 +180,9 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     - ElectricStorage: Sizes and state-of-charge series
     - ElectricUtility: Grid dispatch series and emissions
     - ElectricLoad: Load profile used
-    - ElectricTariff: Energy and demand costs, peak demands by month/ratchet
+    - ElectricTariff: Separate cost components (total_energy_cost, total_export_benefit,
+      total_tou_demand_cost, total_monthly_demand_cost), a combined total_electricity_bill,
+      per-timestep energy/export series, and peak demands by month/ratchet
 
     """
 
@@ -193,6 +195,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
               "Unsupported inputs found: $(join(unsupported_keys, ", ")).")
     end
     # Error if multiple PVs
+    # TODO: Handle multiple PVs
     if haskey(d, "PV") && length(d["PV"]) > 1
         error("MPC: Multiple PV systems are not supported.")
     end
@@ -234,7 +237,6 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     horizon             = 24 * time_steps_per_hour
     per_iter_timeout_s  = 30.0
 
-    # TODO: Handle multiple PVs
     # Update sizing_post to remove solver settings and dispatch inputs, to be able to validate inputs using REoptInputs
     sizing_post = deepcopy(d)
     settings = get(sizing_post, "Settings", Dict())
@@ -325,6 +327,27 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     # Extract emissions defaults (or use user input if provided)
     co2_grid_emissions_series = Float64.(s.electric_utility.emissions_factor_series_lb_CO2_per_kwh)
 
+    # --- Export / net metering setup (mirror the sizing-run scenario) ---
+    # NEM is enabled in MPC when ElectricUtility.net_metering_limit_kw > 0.
+    nm_limit_kw = Float64(s.electric_utility.net_metering_limit_kw)
+
+    # WHL (net billing) rate: export_rates[:WHL] in the processed scenario is a negative "cost";
+    # MPCElectricTariff expects a positive wholesale_rate (it negates internally).
+    whl_rate_full = (:WHL in s.electric_tariff.export_bins) ?
+                    -1.0 .* Float64.(s.electric_tariff.export_rates[:WHL]) : nothing
+
+    # PV export capability comes from the processed PV struct.
+    pv_can_net_meter = !isempty(s.pvs) ? Bool(s.pvs[1].can_net_meter) : false
+    pv_can_wholesale = !isempty(s.pvs) ? Bool(s.pvs[1].can_wholesale) : false
+
+    # Battery export capability comes from the processed ElectricStorage struct
+    _batt_attr = s.storage.attr["ElectricStorage"]
+    batt_can_net_meter = Bool(_batt_attr.can_net_meter)
+    batt_can_wholesale = Bool(_batt_attr.can_wholesale)
+
+    # NEM export is credited (approximately) at the retail energy rate; used for cost reporting below.
+    nem_active = nm_limit_kw > 0 && (pv_can_net_meter || batt_can_net_meter)
+
     month_starts = get_month_transition_timesteps(time_steps_per_hour)
 
     # ts_to_month = 8760 array specifying which month each timestep falls in (1-12)
@@ -353,6 +376,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
         ),
         "ElectricStorage" => Dict(
             "storage_to_load_series_kw" => Float64[],
+            "storage_to_grid_series_kw" => Float64[],
             "soc_series_fraction"       => Float64[],
         ),
         "ElectricUtility" => Dict(
@@ -364,18 +388,37 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
             "load_series_kw" => Float64[],
         ),
     )
-    energy_cost_series = Float64[]
+    energy_charge_series = Float64[]      # grid purchase (energy) charges per timestep
+    export_benefit_series = Float64[]     # NEM/WHL export credits per timestep (positive = revenue)
     total_energy_cost = 0.0
+    total_export_benefit = 0.0
     soc_init_frac = soc_0
 
     # Build MPC post
     function build_mpc_post(current_horizon_pv, current_horizon_load, current_horizon_energy_rates, 
                             current_horizon_emissions, current_horizon_tou_ts, current_horizon_monthly_ts,
-                            tou_previous_peak_demands, monthly_previous_peak_demands, soc_init_frac)
+                            tou_previous_peak_demands, monthly_previous_peak_demands, soc_init_frac,
+                            current_horizon_whl_rate)
+        tariff = Dict(
+            "energy_rates" => current_horizon_energy_rates,
+            "tou_demand_rates" => tou_demand_rates,
+            "tou_demand_ratchet_time_steps" => current_horizon_tou_ts,
+            "tou_previous_peak_demands" => tou_previous_peak_demands,
+            "monthly_demand_rates" => monthly_demand_rates,
+            "time_steps_monthly" => current_horizon_monthly_ts,
+            "monthly_previous_peak_demands" => monthly_previous_peak_demands,
+        )
+        # WHL (net billing) export: MPCElectricTariff reads a positive `wholesale_rate` and
+        # builds the :WHL export bin when it is provided.
+        if current_horizon_whl_rate !== nothing
+            tariff["wholesale_rate"] = current_horizon_whl_rate
+        end
         return Dict(
             "PV" => Dict(
                 "size_kw" => pv_kw,
                 "production_factor_series" => current_horizon_pv,
+                "can_net_meter" => pv_can_net_meter,
+                "can_wholesale" => pv_can_wholesale,
             ),
             "ElectricStorage" => Dict(
                 "size_kw" => batt_kw,
@@ -384,20 +427,16 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
                 "discharge_efficiency" => discharge_eff,
                 "soc_init_fraction" => soc_init_frac,
                 "soc_min_fraction" => soc_min,
+                "can_net_meter" => batt_can_net_meter,
+                "can_wholesale" => batt_can_wholesale,
             ),
             "ElectricLoad" => Dict(
                 "loads_kw" => current_horizon_load,
             ),
-            "ElectricTariff" => Dict(
-                "energy_rates" => current_horizon_energy_rates,
-                "tou_demand_rates" => tou_demand_rates,
-                "tou_demand_ratchet_time_steps" => current_horizon_tou_ts,
-                "tou_previous_peak_demands" => tou_previous_peak_demands,
-                "monthly_demand_rates" => monthly_demand_rates,
-                "time_steps_monthly" => current_horizon_monthly_ts,
-                "monthly_previous_peak_demands" => monthly_previous_peak_demands,
-            ),
+            "ElectricTariff" => tariff,
+            # net_metering_limit_kw drives the NEM export bin in MPCElectricTariff (NEM on if > 0)
             "ElectricUtility" => Dict(
+                "net_metering_limit_kw" => nm_limit_kw,
                 "emissions_factor_series_lb_CO2_per_kwh" => current_horizon_emissions,
             ),
         )
@@ -411,6 +450,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
         current_horizon_load = slice_data(loads_kw, idx, end_ts)
         current_horizon_energy_rates = slice_data(energy_rates, idx, end_ts)
         current_horizon_emissions = slice_data(co2_grid_emissions_series, idx, end_ts)
+        current_horizon_whl_rate = whl_rate_full === nothing ? nothing : slice_data(whl_rate_full, idx, end_ts)
 
         # List of length n_tou_ratchets, specifies which ts of the current horizon are in each TOU ratchet 
         # by placing values 1 to horizon into the corresponding element of the array based on ratchet number
@@ -433,7 +473,8 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
 
         post = build_mpc_post(current_horizon_pv, current_horizon_load, current_horizon_energy_rates, 
                               current_horizon_emissions, current_horizon_tou_ts, current_horizon_monthly_ts,
-                              tou_previous_peak_demands, monthly_previous_peak_demands, soc_init_frac
+                              tou_previous_peak_demands, monthly_previous_peak_demands, soc_init_frac,
+                              current_horizon_whl_rate
                               )
 
         model = get_solver_model(get_solver_model_type(solver_name),
@@ -450,6 +491,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
         pv_to_grid    = haskey(pv_res, "electric_to_grid_series_kw")   ? pv_res["electric_to_grid_series_kw"][1]   : 0.0
         pv_curtailed  = haskey(pv_res, "electric_curtailed_series_kw") ? pv_res["electric_curtailed_series_kw"][1] : 0.0
         batt_to_load  = batt_res["storage_to_load_series_kw"][1]
+        batt_to_grid  = haskey(batt_res, "storage_to_grid_series_kw") ? batt_res["storage_to_grid_series_kw"][1] : 0.0
         batt_soc      = batt_res["soc_series_fraction"][1]
         util_to_load  = util_res["electric_to_load_series_kw"][1]
         util_to_batt  = util_res["electric_to_storage_series_kw"][1]
@@ -460,6 +502,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
         push!(dispatch_series["PV"]["electric_to_grid_series_kw"], pv_to_grid)
         push!(dispatch_series["PV"]["electric_curtailed_series_kw"], pv_curtailed)
         push!(dispatch_series["ElectricStorage"]["storage_to_load_series_kw"], batt_to_load)
+        push!(dispatch_series["ElectricStorage"]["storage_to_grid_series_kw"], batt_to_grid)
         push!(dispatch_series["ElectricStorage"]["soc_series_fraction"], batt_soc)
         push!(dispatch_series["ElectricUtility"]["electric_to_load_series_kw"], util_to_load)
         push!(dispatch_series["ElectricUtility"]["electric_to_storage_series_kw"], util_to_batt)
@@ -467,10 +510,22 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
               co2_grid_emissions_series[idx] * grid_power / time_steps_per_hour)
         push!(dispatch_series["ElectricLoad"]["load_series_kw"], loads_kw[idx])
 
-        # Running energy costs
-        step_energy_cost = grid_power * energy_rates[idx] / time_steps_per_hour
-        push!(energy_cost_series, step_energy_cost)
-        total_energy_cost += step_energy_cost
+        # Running electricity costs (reported as separate components; see results below)
+        # Energy (grid purchase) charge for this timestep
+        step_energy_charge = grid_power * energy_rates[idx] / time_steps_per_hour
+
+        # Export credit for this timestep. NEM credits at the retail energy rate; otherwise WHL credits
+        # at the wholesale rate. NOTE: when both NEM and WHL are available the model chooses per horizon
+        # and the executed-timestep bin split is not returned, so this can misprice such timesteps.
+        step_export_kw = pv_to_grid + batt_to_grid
+        export_rate_idx = nem_active ? energy_rates[idx] :
+                          (whl_rate_full !== nothing ? whl_rate_full[idx] : 0.0)
+        step_export_benefit = step_export_kw * export_rate_idx / time_steps_per_hour
+
+        push!(energy_charge_series, step_energy_charge)
+        push!(export_benefit_series, step_export_benefit)
+        total_energy_cost += step_energy_charge
+        total_export_benefit += step_export_benefit
 
         soc_init_frac = batt_soc
 
@@ -506,12 +561,19 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
             "ElectricUtility" => dispatch_series["ElectricUtility"],
             "ElectricLoad" => dispatch_series["ElectricLoad"],
             "ElectricTariff" => Dict(
-                "total_energy_cost" => total_energy_cost,
-                "energy_cost_series_per_timestep" => energy_cost_series,
-                "total_tou_demand_cost" => tou_demand_cost_total,
-                "total_monthly_demand_cost" => monthly_demand_cost_total,
-                "tou_peaks_by_ratchet_kw" => tou_previous_peak_demands,
-                "monthly_peaks_kw" => monthly_previous_peak_demands,
+                # --- Cost components (before tax); combine for the total bill below ---
+                "total_energy_cost"                   => total_energy_cost,   # grid purchases (energy) only
+                "total_export_benefit"                => total_export_benefit,  # NEM/WHL credits (positive = revenue)
+                "total_tou_demand_cost"               => tou_demand_cost_total,
+                "total_monthly_demand_cost"           => monthly_demand_cost_total,
+                # --- Total electricity bill = energy charge - export benefit + demand charges ---
+                "total_electricity_bill"              => total_energy_cost - total_export_benefit +
+                                                         tou_demand_cost_total + monthly_demand_cost_total,
+                # --- Per-timestep series (energy/exports only; demand is a peak-based charge) ---
+                "energy_charge_series_per_timestep"   => energy_charge_series,
+                "export_benefit_series_per_timestep"  => export_benefit_series,
+                "tou_peaks_by_ratchet_kw"             => tou_previous_peak_demands,
+                "monthly_peaks_kw"                    => monthly_previous_peak_demands,
             ),
         )
     )
