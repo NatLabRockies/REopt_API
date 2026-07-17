@@ -304,7 +304,6 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     # Extract tariff inputs relevant to MPC (use first tier only if tiered rates)
     # TODO: Are all of these relevant? Any missing inputs? 
     # TODO: Implement lookback (demand_lookback_months, demand_lookback_percent, demand_lookback_range) Ignoring coincident peak charges for now 
-    # TODO: Need to think through NEM or passing back export values (wholesale_rate, export_rate_beyond_net_metering_limit)
     energy_rates = Float64.(s.electric_tariff.energy_rates[:, 1])
     monthly_demand_rates = isempty(s.electric_tariff.monthly_demand_rates) ?
                            zeros(Float64, 12) : Float64.(s.electric_tariff.monthly_demand_rates[:, 1])
@@ -388,7 +387,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
             "load_series_kw" => Float64[],
         ),
     )
-    energy_charge_series = Float64[]      # grid purchase (energy) charges per timestep
+    energy_cost_series = Float64[]      # grid purchase (energy) charges per timestep
     export_benefit_series = Float64[]     # NEM/WHL export credits per timestep (positive = revenue)
     total_energy_cost = 0.0
     total_export_benefit = 0.0
@@ -522,7 +521,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
                           (whl_rate_full !== nothing ? whl_rate_full[idx] : 0.0)
         step_export_benefit = step_export_kw * export_rate_idx / time_steps_per_hour
 
-        push!(energy_charge_series, step_energy_charge)
+        push!(energy_cost_series, step_energy_charge)
         push!(export_benefit_series, step_export_benefit)
         total_energy_cost += step_energy_charge
         total_export_benefit += step_export_benefit
@@ -570,7 +569,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
                 "total_electricity_bill"              => total_energy_cost - total_export_benefit +
                                                          tou_demand_cost_total + monthly_demand_cost_total,
                 # --- Per-timestep series (energy/exports only; demand is a peak-based charge) ---
-                "energy_charge_series_per_timestep"   => energy_charge_series,
+                "energy_cost_series_per_timestep"     => energy_cost_series,
                 "export_benefit_series_per_timestep"  => export_benefit_series,
                 "tou_peaks_by_ratchet_kw"             => tou_previous_peak_demands,
                 "monthly_peaks_kw"                    => monthly_previous_peak_demands,
