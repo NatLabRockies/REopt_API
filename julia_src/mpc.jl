@@ -194,10 +194,18 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
         error("When using MPC (daily_foresight_optimized dispatch), only PV and ElectricStorage are supported technologies. " *
               "Unsupported inputs found: $(join(unsupported_keys, ", ")).")
     end
-    # Error if multiple PVs
+    # PV can be provided as a Dict (single system) or an array of Dicts.
+    # MPC only supports a single PV, so error on multiple PVs and normalize a
+    # one-element array down to a Dict so downstream code can treat d["PV"] as a Dict.
     # TODO: Handle multiple PVs
-    if haskey(d, "PV") && length(d["PV"]) > 1
-        error("MPC: Multiple PV systems are not supported.")
+    if haskey(d, "PV") && isa(d["PV"], AbstractArray)
+        if length(d["PV"]) > 1
+            error("MPC: Multiple PV systems are not supported.")
+        elseif length(d["PV"]) == 1
+            d["PV"] = d["PV"][1]
+        else
+            delete!(d, "PV")  # empty PV array -> treat as no PV
+        end
     end
 
     # Error if unsupported CO2/renewable-fraction constraints are set
@@ -218,7 +226,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     # TODO: Add warnings for REopt inputs and scenarios that are not modeled in MPC (e.g., coincident peak charges, demand lookback, etc.)
     @warn "Using MPC to determine dispatch. MPC does not model: tiered electricity rates; rates will be flattened to the first tier."
 
-    # TODO: Error if rate tariff contains lookbacks. 
+    # TODO: Error if rate tariff contains lookbacks or coincident peak charges. 
 
     # TODO: Test with outage inputs before enabling this warning. 
     # # Warning for outage inputs (MPC does not model outages)
@@ -313,6 +321,9 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     n_tou_ratchets = length(tou_demand_rates) # Number of TOU ratchets
     tou_previous_peak_demands = zeros(Float64, n_tou_ratchets) # Tracks past TOU peak demand per ratchet
     monthly_previous_peak_demands = zeros(Float64, 12) # Tracks past monthly peak demand
+
+    println("monthly_demand_rates: ", monthly_demand_rates)
+
 
     # Extract storage efficiency and SOC defaults from processed inputs
     rect_eff  = Float64(s.storage.attr["ElectricStorage"].rectifier_efficiency_fraction)
