@@ -181,7 +181,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     - ElectricUtility: Grid dispatch series and emissions
     - ElectricLoad: Load profile used
     - ElectricTariff: Separate cost components (total_energy_cost, total_export_benefit,
-      total_tou_demand_cost, total_monthly_demand_cost), a combined total_electricity_bill,
+      total_tou_demand_cost, total_non_tou_monthly_demand_cost), a combined total_electricity_bill,
       per-timestep energy/export series, and peak demands by month/ratchet
 
     """
@@ -264,7 +264,19 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     model_inputs = nothing
     try
         model_inputs = reoptjl.REoptInputs(sizing_post)
-        @info "Successfully processed REopt inputs." 
+
+        # REoptInputs returns an error Dict (rather than throwing) when input validation fails.
+        # Surface those messages instead of falling through to get_technology_sizes!, which expects
+        # a REoptInputs and would otherwise raise a confusing MethodError.
+        if isa(model_inputs, Dict)
+            @error "REopt input validation failed during MPC pre-solve." messages=get(model_inputs, "Messages", Dict())
+            return build_mpc_response(
+                "error",
+                messages = get(model_inputs, "Messages", Dict("errors" => ["REopt input validation failed."]))
+            )
+        else
+            @info "Successfully processed REopt inputs."
+        end 
     catch e
         @error "Something went wrong during REopt inputs processing!" exception=(e, catch_backtrace())
         return build_mpc_response(
@@ -272,7 +284,9 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
             messages = Dict("errors" => [sprint(showerror, e)])
         )
     end
-   
+
+
+
     # MPC requires fixed PV and battery sizes. If not provided, call REopt first in a sizing run.
     technology_sizes = get_technology_sizes!(d, model_inputs, solver_settings)
     s = model_inputs.s  # Access the processed Scenario struct
@@ -412,7 +426,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
         tariff = Dict(
             "energy_rates" => current_horizon_energy_rates,
             "tou_demand_rates" => tou_demand_rates,
-            "tou_demand_ratchet_time_steps" => current_horizon_tou_ts,
+            "tou_demand_time_steps" => current_horizon_tou_ts,
             "tou_previous_peak_demands" => tou_previous_peak_demands,
             "monthly_demand_rates" => monthly_demand_rates,
             "time_steps_monthly" => current_horizon_monthly_ts,
@@ -575,7 +589,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
                 "total_energy_cost"                   => total_energy_cost,   # grid purchases (energy) only
                 "total_export_benefit"                => total_export_benefit,  # NEM/WHL credits (positive = revenue)
                 "total_tou_demand_cost"               => tou_demand_cost_total,
-                "total_monthly_demand_cost"           => monthly_demand_cost_total,
+                "total_non_tou_monthly_demand_cost"   => monthly_demand_cost_total,
                 # --- Total electricity bill = energy charge - export benefit + demand charges ---
                 "total_electricity_bill"              => total_energy_cost - total_export_benefit +
                                                          tou_demand_cost_total + monthly_demand_cost_total,
