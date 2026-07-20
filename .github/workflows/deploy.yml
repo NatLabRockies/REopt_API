@@ -99,6 +99,9 @@ jobs:
       metadata: ${{ needs.deploy-metadata.outputs.staging-metadata }}
       vault-registry-credentials-path: secret/data/deploy/common/aws-ecr
       vault-kubeconfig-path: secret/data/deploy/staging/on-prem-rancher-test-ponderosa-cluster-test-reopt
+      # FIXME: Temporarily disable deploys and perform a dry run so we can see
+      # how all this would get rolled out once we merge with `main`.
+      dry-run: true
     secrets:
       vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
       vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
@@ -114,6 +117,9 @@ jobs:
       metadata: ${{ needs.deploy-metadata.outputs.production-metadata }}
       vault-registry-credentials-path: secret/data/deploy/common/aws-ecr
       vault-kubeconfig-path: secret/data/deploy/production/on-prem-rancher-ponderosa-cluster-reopt
+      # FIXME: Temporarily disable deploys and perform a dry run so we can see
+      # how all this would get rolled out once we merge with `main`.
+      dry-run: true
     secrets:
       vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
       vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
