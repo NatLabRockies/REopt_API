@@ -1,0 +1,54 @@
+import "./AppKbldConfig.pkl"
+import "@k8s/K8sResource.pkl"
+import "@tadaSharedKube/TadaAppNamespace.pkl"
+import "@tadaSharedKube/TadaEcrLoginRenewConfigMap.pkl"
+import "@tadaSharedKube/TadaEcrLoginRenewCronJob.pkl"
+import "@tadaSharedKube/TadaEcrLoginRenewInitialSetupJob.pkl"
+import "@tadaSharedKube/TadaEcrLoginRenewRole.pkl"
+import "@tadaSharedKube/TadaEcrLoginRenewRoleBinding.pkl"
+import "@tadaSharedKube/TadaEcrLoginRenewSecrets.pkl"
+import "@tadaSharedKube/TadaEcrLoginRenewServiceAccount.pkl"
+import "@tadaSharedKube/TadaWebConfigMap.pkl"
+import "@tadaSharedKube/TadaWebDbMigrateSecrets.pkl"
+import "@tadaSharedKube/TadaWebRunJob.pkl"
+import "@tadaSharedKube/TadaWebSecrets.pkl"
+
+local containerImage = read?("env:RUN_JOB_CONTAINER_IMAGE") ?? "reopt-api"
+
+resources: Listing<K8sResource> = new {
+  new TadaAppNamespace {
+    tadaRancherResourceQuotaPodLimit = 1
+  }
+
+  new AppKbldConfig {}
+
+  // To be able to pull images from our ECR repos in our on-premise (non-AWS)
+  // clusters.
+  local ecrLoginRenewConfigMapResource = new TadaEcrLoginRenewConfigMap {}
+  ecrLoginRenewConfigMapResource
+  new TadaEcrLoginRenewCronJob {}
+  new TadaEcrLoginRenewInitialSetupJob {}
+  new TadaEcrLoginRenewRoleBinding {}
+  new TadaEcrLoginRenewRole {}
+  new TadaEcrLoginRenewSecrets {}
+  new TadaEcrLoginRenewServiceAccount {}
+
+  new TadaWebConfigMap {}
+
+  local secretResource = new TadaWebSecrets {}
+  secretResource
+
+  new TadaWebRunJob {
+    tadaContainerImage = containerImage
+    tadaImagePullSecretName = ecrLoginRenewConfigMapResource.imagePullSecretName
+    tadaJobCommand = read("env:RUN_JOB_COMMAND")
+    tadaSecretName = secretResource.metadata.name
+  }
+}
+
+output {
+  value = resources
+  renderer = (K8sResource.output.renderer as YamlRenderer) {
+    isStream = true
+  }
+}

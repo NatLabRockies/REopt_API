@@ -1,0 +1,118 @@
+name: Restart Celery & Julia
+
+on:
+  schedule:
+    - cron: "23 8 * * *" # Every day at 01:23 AM MST / 02:23 AM MDT
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-metadata:
+    name: Deploy Metadata
+    runs-on: self-hosted
+    outputs:
+      ci-deploy-image: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).ci_deploy_image }}
+      staging-perform-deploy: ${{ steps.staging-metadata.outputs.perform-deploy }}
+      staging-perform-undeploy: ${{ steps.staging-metadata.outputs.perform-undeploy }}
+      staging-metadata: ${{ toJSON(steps.staging-metadata.outputs) }}
+      production-perform-deploy: ${{ steps.production-metadata.outputs.perform-deploy }}
+      production-metadata: ${{ toJSON(steps.production-metadata.outputs) }}
+    steps:
+      - name: Import vault nonsensitive secrets
+        id: vault-nonsensitive-secrets
+        uses: TADA/vault-action/nonsensitive-secrets@v1
+        with:
+          template: |
+            {{ with (datasource "vault" "reopt-api/ci/deploy").data }}
+              {{ $secrets = coll.Merge (coll.Dict
+                "ci_deploy_image" .ci_deploy_image
+                "container_registry" .container_registry
+                "production_rancher_project_id" .production_rancher_project_id
+                "production_url_host" .production_url_host
+                "staging_rancher_project_id" .staging_rancher_project_id
+                "staging_url_host_base" .staging_url_host_base
+              ) $secrets }}
+            {{ end }}
+          vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
+          vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
+
+      - name: Staging Metadata
+        id: staging-metadata
+        uses: TADA/deploy-action/metadata@v2
+        with:
+          deploy-env: staging
+          app-name: reopt-api
+          rancher-project-id: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).staging_rancher_project_id }}
+          registry: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).container_registry }}
+          branch-url-host-base: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).staging_url_host_base }}
+          branch-db-name-base: reopt_api_staging
+
+      - name: Production Metadata
+        id: production-metadata
+        uses: TADA/deploy-action/metadata@v2
+        with:
+          deploy-env: production
+          app-name: reopt-api
+          rancher-project-id: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).production_rancher_project_id }}
+          registry: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).container_registry }}
+          branch-url-host-base: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).production_url_host }}
+
+  restart-staging:
+    name: Restart Staging
+    needs:
+      - deploy-metadata
+    if: ${{ needs.deploy-metadata.outputs.staging-perform-deploy == 'true' }}
+    runs-on: self-hosted
+    container:
+      image: ${{ needs.deploy-metadata.outputs.ci-deploy-image }}
+    env:
+      NODE_OPTIONS: --use-openssl-ca
+    steps:
+      - name: Kubernetes config setup
+        uses: TADA/deploy-action/kubeconfig@v2
+        with:
+          vault-kubeconfig-path: secret/data/deploy/staging/on-prem-rancher-test-ponderosa-cluster-test-reopt
+          vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
+          vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
+          rancher-project-id: ${{ fromJSON(needs.deploy-metadata.outputs.staging-metadata).rancher-project-id }}
+      - name: Rollout restart
+        env:
+          app_namespace: "${{ fromJSON(needs.deploy-metadata.outputs.staging-metadata).app-namespace }}"
+        run: |
+          set -x
+          kubectl -n "$app_namespace" rollout restart deployment/celery-deployment
+          kubectl -n "$app_namespace" rollout status deployment/celery-deployment --timeout=10m
+          kubectl -n "$app_namespace" rollout restart deployment/julia-deployment
+          kubectl -n "$app_namespace" rollout status deployment/julia-deployment --timeout=10m
+
+  restart-production:
+    name: Restart Production
+    needs:
+      - deploy-metadata
+      - restart-staging
+    if: ${{ needs.deploy-metadata.outputs.production-perform-deploy == 'true' }}
+    runs-on: self-hosted
+    container:
+      image: ${{ needs.deploy-metadata.outputs.ci-deploy-image }}
+    env:
+      NODE_OPTIONS: --use-openssl-ca
+    steps:
+      - name: Kubernetes config setup
+        uses: TADA/deploy-action/kubeconfig@v2
+        with:
+          vault-kubeconfig-path: secret/data/deploy/production/on-prem-rancher-ponderosa-cluster-reopt
+          vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
+          vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
+          rancher-project-id: ${{ fromJSON(needs.deploy-metadata.outputs.production-metadata).rancher-project-id }}
+      - name: Rollout restart
+        env:
+          app_namespace: "${{ fromJSON(needs.deploy-metadata.outputs.production-metadata).app-namespace }}"
+        run: |
+          set -x
+          kubectl -n "$app_namespace" rollout restart deployment/celery-deployment
+          kubectl -n "$app_namespace" rollout status deployment/celery-deployment --timeout=10m
+          kubectl -n "$app_namespace" rollout restart deployment/julia-deployment
+          kubectl -n "$app_namespace" rollout status deployment/julia-deployment --timeout=10m

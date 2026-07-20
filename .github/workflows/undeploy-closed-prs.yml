@@ -1,0 +1,54 @@
+name: Undeploy Closed PRs
+
+on:
+  schedule:
+    - cron: "23 16 * * *" # Every day at 09:23 AM MST / 10:23 AM MDT
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-metadata:
+    name: Deploy Metadata
+    runs-on: self-hosted
+    outputs:
+      staging-metadata: ${{ toJSON(steps.staging-metadata.outputs) }}
+    steps:
+      - name: Import vault nonsensitive secrets
+        id: vault-nonsensitive-secrets
+        uses: TADA/vault-action/nonsensitive-secrets@v1
+        with:
+          template: |
+            {{ with (datasource "vault" "reopt-api/ci/deploy").data }}
+              {{ $secrets = coll.Merge (coll.Dict
+                "staging_rancher_project_id" .staging_rancher_project_id
+                "staging_url_host_base" .staging_url_host_base
+              ) $secrets }}
+            {{ end }}
+          vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
+          vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
+
+      - name: Staging Metadata
+        id: staging-metadata
+        uses: TADA/deploy-action/metadata@v2
+        with:
+          deploy-env: staging
+          app-name: reopt-api
+          rancher-project-id: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).staging_rancher_project_id }}
+          branch-url-host-base: ${{ fromJSON(steps.vault-nonsensitive-secrets.outputs.nonsensitive-secrets).staging_url_host_base }}
+          branch-db-name-base: reopt_api_staging
+
+  undeploy-staging:
+    name: Undeploy Staging
+    needs:
+      - deploy-metadata
+    uses: TADA/deploy-action/.github/workflows/undeploy-closed-prs.yml@v2
+    with:
+      base-metadata: ${{ needs.deploy-metadata.outputs.staging-metadata }}
+      vault-kubeconfig-path: secret/data/deploy/staging/on-prem-rancher-test-ponderosa-cluster-test-reopt
+      vault-db-superuser-path: secret/data/reopt-db/staging/db-superuser
+    secrets:
+      vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
+      vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
