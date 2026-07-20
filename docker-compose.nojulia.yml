@@ -16,7 +16,6 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     environment:
-      - POSTGRES_USER=reopt
       - POSTGRES_PASSWORD=reopt
       - POSTGRES_DB=reopt
     expose:
@@ -34,9 +33,8 @@ services:
       - APP_ENV=local
       - DB_HOST=db
       - DB_NAME=reopt
-      - DB_USERNAME=reopt
+      - DB_USERNAME=postgres
       - DB_PASSWORD=reopt
-      - DB_SEARCH_PATH=public
       - REDIS_HOST=redis
       - REDIS_PASSWORD=
       - JULIA_HOST=host.docker.internal 
@@ -60,9 +58,8 @@ services:
       - APP_ENV=local
       - DB_HOST=db
       - DB_NAME=reopt
-      - DB_USERNAME=reopt
+      - DB_USERNAME=postgres
       - DB_PASSWORD=reopt
-      - DB_SEARCH_PATH=public
       - REDIS_HOST=redis
       - REDIS_PASSWORD=
       - JULIA_HOST=host.docker.internal 

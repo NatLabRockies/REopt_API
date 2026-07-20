@@ -10,6 +10,10 @@ on:
       - reopened
       - unlabeled
   workflow_dispatch:
+    inputs:
+      db-sync-restore:
+        description: "Staging Only: Restore this branch's database with a recent snapshot from production."
+        type: boolean
 
 concurrency:
   # Concurrency group is more complicated in this case because:

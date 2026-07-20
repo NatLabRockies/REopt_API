@@ -4,6 +4,9 @@ import os
 import django
 import rollbar
 import sys
+from django.db import connections
+from django.db.models.signals import pre_migrate
+
 
 """
 Django settings for reopt_api project.
@@ -99,13 +102,6 @@ DATABASES = {
         'PASSWORD': db_password,
     }
 }
-if 'test' in sys.argv or APP_ENV == 'local':
-    DATABASES['default']['NAME'] = 'reopt'
-    DATABASES['default']['USER'] = 'reopt'
-    DATABASES['default']['PASSWORD'] = 'reopt'
-    DATABASES['default']['OPTIONS'] = {
-        'options': '-c search_path=public'
-    }
 
 
 # Internationalization
@@ -179,6 +175,31 @@ rollbar.init(**ROLLBAR)
 APPEND_SLASH = False
 TASTYPIE_ALLOW_MISSING_SLASH = True
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+
+# Create the default PostgreSQL schema before any migrations run if it doesn't
+# already exist.
+def create_postgres_schema(sender, **kwargs):
+    using = kwargs.get('using', 'default')
+    connection = connections[using]
+    with connection.cursor() as cursor:
+        # Wrap in extra conditions so it can execute even if user doesn't have
+        # "CREATE" privileges and schema already exists.
+        cursor.execute(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = 'reopt_api') THEN
+                    CREATE SCHEMA IF NOT EXISTS reopt_api;
+                END IF;
+                IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'reopt_api') THEN
+                    ALTER SCHEMA reopt_api OWNER TO reopt_api;
+                END IF;
+            END;
+            $$;
+            """
+        )
+
+pre_migrate.connect(create_postgres_schema)
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "reopt_api.settings")
 django.setup()
