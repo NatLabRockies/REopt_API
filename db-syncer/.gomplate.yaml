@@ -1,0 +1,3 @@
+datasources:
+  vault:
+    url: "vault:///secret/data"
