@@ -1,4 +1,4 @@
-using HTTP, JSON, JuMP
+﻿using HTTP, JSON, JuMP
 using HiGHS, Cbc, SCIP
 using GhpGhx
 import REopt as reoptjl  # For REopt.jl, needed because we still have local REopt.jl module for V1/V2
@@ -238,7 +238,7 @@ function reopt(req::HTTP.Request)
             end     
             if haskey(d, "ElectricStorage")
                 inputs_with_defaults_from_julia_electric_storage = [
-                    :macrs_option_years, :macrs_bonus_fraction, :total_itc_fraction
+                    :macrs_option_years, :macrs_bonus_fraction, :total_itc_fraction, :internal_efficiency_fraction
                 ]
                 electric_storage_dict = Dict(key=>getfield(model_inputs.s.storage.attr["ElectricStorage"], key) for key in inputs_with_defaults_from_julia_electric_storage)
             else
