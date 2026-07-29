@@ -194,13 +194,12 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
         error("When using MPC (daily_foresight_optimized dispatch), only PV and ElectricStorage are supported technologies. " *
               "Unsupported inputs found: $(join(unsupported_keys, ", ")).")
     end
-    # PV can be provided as a Dict (single system) or an array of Dicts.
-    # MPC only supports a single PV, so error on multiple PVs and normalize a
-    # one-element array down to a Dict so downstream code can treat d["PV"] as a Dict.
+
+    # MPC only supports a single PV, so error on multiple PVs and normalize a one-element array down to a Dict so downstream code can treat d["PV"] as a Dict.
     # TODO: Handle multiple PVs
     if haskey(d, "PV") && isa(d["PV"], AbstractArray)
         if length(d["PV"]) > 1
-            error("MPC: Multiple PV systems are not supported.")
+            error("MPC: Multiple PV systems are not supported in MPC runs at this time.")
         elseif length(d["PV"]) == 1
             d["PV"] = d["PV"][1]
         else
@@ -223,10 +222,23 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
         error("MPC: Site.include_exported_renewable_electricity_in_total = false is not supported in MPC runs.")
     end
 
-    # TODO: Add warnings for REopt inputs and scenarios that are not modeled in MPC (e.g., coincident peak charges, demand lookback, etc.)
-    @warn "Using MPC to determine dispatch. MPC does not model: tiered electricity rates; rates will be flattened to the first tier."
+    # Error for off-grid runs
+    if haskey(d, "Settings") && get(d["Settings"], "off_grid_flag", false) == true
+        error("MPC: Off-grid runs are not currently supported in MPC.")
+    end
 
-    # TODO: Error if rate tariff contains lookbacks or coincident peak charges. 
+    # Error if rate tariff contains lookbacks or coincident peak charges. (These are not currently supported in MPC.)
+    if (haskey(d["ElectricTariff"], "demand_lookback_months") && length(d["ElectricTariff"]["demand_lookback_months"]) > 0 ) ||
+        (haskey(d["ElectricTariff"], "demand_lookback_percent") && d["ElectricTariff"]["demand_lookback_percent"] > 0) || 
+        (haskey(d["ElectricTariff"], "demand_lookback_range") && d["ElectricTariff"]["demand_lookback_range"] > 0)
+            error("MPC: ElectricTariff with demand lookbacks is not currently supported in MPC runs.")
+    end
+    if haskey(d["ElectricTariff"], "coincident_peak_load_active_time_steps") && d["ElectricTariff"]["coincident_peak_load_active_time_steps"] != [Int64[]]
+        error("MPC: ElectricTariff with coincident peak charges is not currently supported in MPC runs.")
+    end
+
+    # TODO: show this warning only if tiered rates are detected in the tariff.
+    @warn "Using MPC to determine dispatch. MPC does not model: tiered electricity rates; rates will be flattened to the first tier."
 
     # TODO: Test with outage inputs before enabling this warning. 
     # # Warning for outage inputs (MPC does not model outages)
@@ -266,8 +278,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
         model_inputs = reoptjl.REoptInputs(sizing_post)
 
         # REoptInputs returns an error Dict (rather than throwing) when input validation fails.
-        # Surface those messages instead of falling through to get_technology_sizes!, which expects
-        # a REoptInputs and would otherwise raise a confusing MethodError.
+        # Surface those messages instead of falling through to get_technology_sizes!, which expects a REoptInputs and would otherwise raise a confusing MethodError.
         if isa(model_inputs, Dict)
             @error "REopt input validation failed during MPC pre-solve." messages=get(model_inputs, "Messages", Dict())
             return build_mpc_response(
@@ -284,8 +295,6 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
             messages = Dict("errors" => [sprint(showerror, e)])
         )
     end
-
-
 
     # MPC requires fixed PV and battery sizes. If not provided, call REopt first in a sizing run.
     technology_sizes = get_technology_sizes!(d, model_inputs, solver_settings)
@@ -324,14 +333,12 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     loads_kw = Float64.(s.electric_load.loads_kw)
     
     # Extract tariff inputs relevant to MPC (use first tier only if tiered rates)
-    # TODO: Are all of these relevant? Any missing inputs? 
-    # TODO: Implement lookback (demand_lookback_months, demand_lookback_percent, demand_lookback_range) Ignoring coincident peak charges for now 
+    # TODO: Implement lookbacks (demand_lookback_months, demand_lookback_percent, demand_lookback_range), coincident peak charges, and handling of tiered rates here and in REopt.jl.
     energy_rates = Float64.(s.electric_tariff.energy_rates[:, 1])
     monthly_demand_rates = isempty(s.electric_tariff.monthly_demand_rates) ?
                            zeros(Float64, 12) : Float64.(s.electric_tariff.monthly_demand_rates[:, 1])
     tou_demand_rates = isempty(s.electric_tariff.tou_demand_rates) ? Float64[] : Float64.(s.electric_tariff.tou_demand_rates[:, 1])
     tou_demand_ratchet_time_steps = [Int.(v) for v in s.electric_tariff.tou_demand_ratchet_time_steps]
-    # TODO: Monthly demand has never been tested
     n_tou_ratchets = length(tou_demand_rates) # Number of TOU ratchets
     tou_previous_peak_demands = zeros(Float64, n_tou_ratchets) # Tracks past TOU peak demand per ratchet
     monthly_previous_peak_demands = zeros(Float64, 12) # Tracks past monthly peak demand
@@ -593,11 +600,10 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
                 # --- Total electricity bill = energy charge - export benefit + demand charges ---
                 "total_electricity_bill"              => total_energy_cost - total_export_benefit +
                                                          tou_demand_cost_total + monthly_demand_cost_total,
-                # --- Per-timestep series (energy/exports only; demand is a peak-based charge) ---
                 "energy_cost_series_per_timestep"     => energy_cost_series,
                 "export_benefit_series_per_timestep"  => export_benefit_series,
                 "tou_peaks_by_ratchet_kw"             => tou_previous_peak_demands,
-                "monthly_peaks_kw"                    => monthly_previous_peak_demands,
+                "monthly_peaks_kw"                    => monthly_previous_peak_demands, # Optimal peaks (whereas REopt's ElectricLoad.monthly_peaks_kw is BAU peaks)
             ),
         )
     )
