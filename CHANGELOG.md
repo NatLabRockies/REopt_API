@@ -27,6 +27,13 @@ Classify the change according to the following categories:
     ### Patches
 
 
+## v3.20.0
+### Minor Updates
+##### Changed
+- New deployment process to NLR servers, for production API
+- Update PostgreSQL to v18
+- keys.py setup changed to .env for specifying user's NLR_API_KEY
+
 ## v3.19.1
 ### Patches
 - URL updates due to NREL > NLR name change
