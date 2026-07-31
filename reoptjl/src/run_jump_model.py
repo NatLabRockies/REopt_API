@@ -35,7 +35,11 @@ class RunJumpModelTask(Task):
             exc.save_to_db()
             msg = exc.message
             meta = APIMeta.objects.get(run_uuid=exc.run_uuid)
-            meta.status = "An error occurred. See messages for more."
+            # Server-side failures map to 500 at /results; other failures (e.g. infeasible, timeout) map to 400.
+            if isinstance(exc, (UnexpectedError, REoptFailedToStartError)):
+                meta.status = "Internal Server Error. See messages for more."
+            else:
+                meta.status = "error"
             meta.save(update_fields=["status"])
             Message.create(meta=meta, message_type="error", message=msg).save()
 
@@ -68,10 +72,16 @@ def run_jump_model(run_uuid):
         response_json = response.json()
         if response.status_code == 500:
             raise REoptFailedToStartError(task=name, message=response_json["error"], run_uuid=run_uuid, user_uuid=user_uuid)
-        results = response_json["results"]
-        reopt_version = response_json["reopt_version"]
-        if results["status"].strip().lower() != "error":
-            inputs_with_defaults_set_in_julia = response_json["inputs_with_defaults_set_in_julia"]
+        if response.status_code == 400:
+            # REopt.jl returned an input-validation error; store it as an error result so /results returns 400 with the messages.
+            results = {"status": "error",
+                       "Messages": response_json.get("Messages", {"errors": ["Invalid inputs. Please check your inputs and try again."]})}
+            reopt_version = response_json.get("reopt_version", "")
+        else:
+            results = response_json["results"]
+            reopt_version = response_json["reopt_version"]
+            if results["status"].strip().lower() != "error":
+                inputs_with_defaults_set_in_julia = response_json["inputs_with_defaults_set_in_julia"]
         time_dict["pyjulia_run_reopt_seconds"] = time.time() - t_start
         results.update(time_dict)
 

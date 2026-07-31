@@ -84,7 +84,10 @@ function reopt(req::HTTP.Request)
             @info "Running MPC to obtain daily foresight optimized battery dispatch profile."
             mpc_results = get_mpc_results!(d; solver_name=solver_name)
             # TODO: Cache sizing run results and avoid a second call to REopt? Are those the same results?
-            if get(mpc_results, "skip_mpc", false) == true
+            if get(mpc_results, "status", "") == "error"
+                @error "MPC pre-solve failed input validation" messages=get(mpc_results, "Messages", Dict())
+                return HTTP.Response(400, JSON.json(mpc_results))
+            elseif get(mpc_results, "skip_mpc", false) == true
                 @info "Cannot execute daily_foresight_optimized battery dispatch because optimal battery size is 0. Setting dispatch strategy to 'optimized'."
                 d["ElectricStorage"]["dispatch_strategy"] = "optimized"
             else
@@ -889,11 +892,14 @@ function mpc(req::HTTP.Request)
         error_response["reopt_version"] = string(pkgversion(reoptjl))
     end
     GC.gc()
-    if isempty(error_response)
+    if !isempty(error_response)
+        return HTTP.Response(500, JSON.json(error_response))
+    elseif get(results, "status", "") == "error"
+        @error "MPC failed input validation" messages=get(results, "Messages", Dict())
+        return HTTP.Response(400, JSON.json(results))
+    else
         @info "MPC ran successfully."
         return HTTP.Response(200, JSON.json(results))
-    else
-        return HTTP.Response(500, JSON.json(error_response))
     end
 end
 

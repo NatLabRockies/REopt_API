@@ -126,7 +126,6 @@ function get_technology_sizes!(d::Dict, model_inputs::reoptjl.REoptInputs, solve
 
     m = get_solver_model(get_solver_model_type(solver_settings["solver_name"]), solver_settings["solver_attributes"])
 
-    # model_inputs = reoptjl.REoptInputs(sizing_post)
     sizing_results = reoptjl.run_reopt(m, model_inputs)
 
     if get(sizing_results, "status", "") != "optimal"
@@ -191,15 +190,21 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     mpc_allowed_keys = Set(["PV", "ElectricStorage", "ElectricLoad", "ElectricTariff", "ElectricUtility", "Site", "Settings", "Financial"])
     unsupported_keys = setdiff(keys(d), mpc_allowed_keys)
     if !isempty(unsupported_keys)
-        error("When using MPC (daily_foresight_optimized dispatch), only PV and ElectricStorage are supported technologies. " *
-              "Unsupported inputs found: $(join(unsupported_keys, ", ")).")
+        return build_mpc_response(
+            "error",
+            messages = Dict("errors" => ["When using MPC (daily_foresight_optimized dispatch), only PV and ElectricStorage are supported technologies. " *
+                                        "Unsupported inputs found: $(join(unsupported_keys, ", "))."])
+        )
     end
 
     # MPC only supports a single PV, so error on multiple PVs and normalize a one-element array down to a Dict so downstream code can treat d["PV"] as a Dict.
     # TODO: Handle multiple PVs
     if haskey(d, "PV") && isa(d["PV"], AbstractArray)
         if length(d["PV"]) > 1
-            error("MPC: Multiple PV systems are not supported in MPC runs at this time.")
+            return build_mpc_response(
+                "error",
+                messages = Dict("errors" => ["MPC: Multiple PV systems are not supported in MPC runs at this time."])
+            )
         elseif length(d["PV"]) == 1
             d["PV"] = d["PV"][1]
         else
@@ -207,34 +212,45 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
         end
     end
 
-    # Error if unsupported CO2/renewable-fraction constraints are set
-    _site_input = get(d, "Site", Dict())
-    if !isnothing(get(_site_input, "CO2_emissions_reduction_min_fraction", nothing))
-        error("MPC: Site.CO2_emissions_reduction_min_fraction is not supported in MPC runs.")
-    end
-    if get(_site_input, "include_grid_renewable_fraction_in_RE_constraints", false) == true
-        error("MPC: Site.include_grid_renewable_fraction_in_RE_constraints is not supported in MPC runs.")
-    end
-    if get(_site_input, "include_exported_elec_emissions_in_total", true) == false
-        error("MPC: Site.include_exported_elec_emissions_in_total = false is not supported in MPC runs.")
-    end
-    if get(_site_input, "include_exported_renewable_electricity_in_total", true) == false
-        error("MPC: Site.include_exported_renewable_electricity_in_total = false is not supported in MPC runs.")
-    end
+    # The checks below are removed because when MPC is called through REopt, the last REopt run will error if these goals are not met. 
+    # If MPC is called directly, specifying these inputs IS an issue (because they're not consdired in MPC dispatch). If the MPC endpoint becomes public, we should re-enable these checks.
+    # # Error if unsupported CO2/renewable-fraction constraints are set
+    # _site_input = get(d, "Site", Dict())
+    # if !isnothing(get(_site_input, "CO2_emissions_reduction_min_fraction", nothing))
+    #     error("MPC: Site.CO2_emissions_reduction_min_fraction is not supported in MPC runs.")
+    # end
+    # if get(_site_input, "include_grid_renewable_fraction_in_RE_constraints", false) == true
+    #     error("MPC: Site.include_grid_renewable_fraction_in_RE_constraints is not supported in MPC runs.")
+    # end
+    # if get(_site_input, "include_exported_elec_emissions_in_total", true) == false
+    #     error("MPC: Site.include_exported_elec_emissions_in_total = false is not supported in MPC runs.")
+    # end
+    # if get(_site_input, "include_exported_renewable_electricity_in_total", true) == false
+    #     error("MPC: Site.include_exported_renewable_electricity_in_total = false is not supported in MPC runs.")
+    # end
 
     # Error for off-grid runs
     if haskey(d, "Settings") && get(d["Settings"], "off_grid_flag", false) == true
-        error("MPC: Off-grid runs are not currently supported in MPC.")
+        return build_mpc_response(
+            "error",
+            messages = Dict("errors" => ["MPC: Off-grid runs are not currently supported in MPC."])
+        )
     end
 
     # Error if rate tariff contains lookbacks or coincident peak charges. (These are not currently supported in MPC.)
     if (haskey(d["ElectricTariff"], "demand_lookback_months") && length(d["ElectricTariff"]["demand_lookback_months"]) > 0 ) ||
         (haskey(d["ElectricTariff"], "demand_lookback_percent") && d["ElectricTariff"]["demand_lookback_percent"] > 0) || 
         (haskey(d["ElectricTariff"], "demand_lookback_range") && d["ElectricTariff"]["demand_lookback_range"] > 0)
-            error("MPC: ElectricTariff with demand lookbacks is not currently supported in MPC runs.")
+            return build_mpc_response(
+                "error",
+                messages = Dict("errors" => ["MPC: ElectricTariff with demand lookbacks is not currently supported in MPC runs."])
+            )
     end
     if haskey(d["ElectricTariff"], "coincident_peak_load_active_time_steps") && d["ElectricTariff"]["coincident_peak_load_active_time_steps"] != [Int64[]]
-        error("MPC: ElectricTariff with coincident peak charges is not currently supported in MPC runs.")
+        return build_mpc_response(
+            "error",
+            messages = Dict("errors" => ["MPC: ElectricTariff with coincident peak charges is not currently supported in MPC runs."])
+        )
     end
 
     # TODO: show this warning only if tiered rates are detected in the tariff.
@@ -342,9 +358,6 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     n_tou_ratchets = length(tou_demand_rates) # Number of TOU ratchets
     tou_previous_peak_demands = zeros(Float64, n_tou_ratchets) # Tracks past TOU peak demand per ratchet
     monthly_previous_peak_demands = zeros(Float64, 12) # Tracks past monthly peak demand
-
-    println("monthly_demand_rates: ", monthly_demand_rates)
-
 
     # Extract storage efficiency and SOC defaults from processed inputs
     rect_eff  = Float64(s.storage.attr["ElectricStorage"].rectifier_efficiency_fraction)
