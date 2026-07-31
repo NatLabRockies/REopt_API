@@ -256,14 +256,6 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     # TODO: show this warning only if tiered rates are detected in the tariff.
     @warn "Using MPC to determine dispatch. MPC does not model: tiered electricity rates; rates will be flattened to the first tier."
 
-    # TODO: Test with outage inputs before enabling this warning. 
-    # # Warning for outage inputs (MPC does not model outages)
-    # _utility_input = get(d, "ElectricUtility", Dict())
-    # if any(k -> haskey(_utility_input, k), ("outage_start_time_step", "outage_start_time_steps", "outage_durations"))
-    #     @warn "MPC: Outage inputs detected (outage_start_time_step, outage_start_time_steps, outage_durations). " *
-    #           "MPC does not model outages; these inputs will be ignored."
-    # end
-
     ## Set up MPC inputs ##
 
     # TODO: MPC horizons and timeout are currently hard coded
@@ -439,6 +431,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     soc_init_frac = soc_0
 
     # Build MPC post
+    # Update this fn if mpc capabilities are updated (e.g., to support outages, multiple PVs, or more tariff inputs)
     function build_mpc_post(current_horizon_pv, current_horizon_load, current_horizon_energy_rates, 
                             current_horizon_emissions, current_horizon_tou_ts, current_horizon_monthly_ts,
                             tou_previous_peak_demands, monthly_previous_peak_demands, soc_init_frac,
