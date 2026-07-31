@@ -189,6 +189,13 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     # Error if any techs other than PV and ElectricStorage are provided
     mpc_allowed_keys = Set(["PV", "ElectricStorage", "ElectricLoad", "ElectricTariff", "ElectricUtility", "Site", "Settings", "Financial"])
     unsupported_keys = setdiff(keys(d), mpc_allowed_keys)
+    # Ignore disallowed technologies that are explicitly disabled with max_kw = 0.
+    for key in copy(unsupported_keys)
+        val = get(d, key, nothing)
+        if val isa AbstractDict && haskey(val, "max_kw") && val["max_kw"] == 0
+            setdiff!(unsupported_keys, [key])
+        end
+    end
     if !isempty(unsupported_keys)
         return build_mpc_response(
             "error",
