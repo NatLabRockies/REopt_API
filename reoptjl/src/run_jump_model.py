@@ -74,8 +74,13 @@ def run_jump_model(run_uuid):
             raise REoptFailedToStartError(task=name, message=response_json["error"], run_uuid=run_uuid, user_uuid=user_uuid)
         if response.status_code == 400:
             # REopt.jl returned an input-validation error; store it as an error result so /results returns 400 with the messages.
-            results = {"status": "error",
-                       "Messages": response_json.get("Messages", {"errors": ["Invalid inputs. Please check your inputs and try again."]})}
+            if "results" in response_json:
+                # Regular reopt error: Messages (incl. has_stacktrace) are nested under "results".
+                results = response_json["results"]
+            else:
+                # MPC-style error envelope has Messages at the top level.
+                results = {"status": "error",
+                           "Messages": response_json.get("Messages", {"errors": ["Invalid inputs. Please check your inputs and try again."]})}
             reopt_version = response_json.get("reopt_version", "")
         else:
             results = response_json["results"]
