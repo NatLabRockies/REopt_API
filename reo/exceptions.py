@@ -1,4 +1,4 @@
-# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NREL/REopt_API/blob/master/LICENSE.
+# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NatLabRockies/REopt_API/blob/master/LICENSE.
 from reo.models import ErrorModel
 import logging
 log = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ class REoptError(Exception):
         :param traceback: sys.exc_info()[2]
         """
         if message == "Wind Dataset Timed Out":
-            msg_with_email = (" Please try again later or email reopt@nrel.gov for support or un-check the wind option "
+            msg_with_email = (" Please try again later or email reopt@nlr.gov for support or un-check the wind option "
             "to take wind out of the analysis")
         elif message.startswith("PV Watts could not locate a dataset station"):
             msg_with_email = (" Please increase your PV search radius parameter, or choose an alternate "
@@ -30,14 +30,14 @@ class REoptError(Exception):
             "You can also use a search radius of 0 to return PV Watts results regardless of distance "
             "to the nearest station.")
         elif run_uuid:
-            msg_with_email = (" Please visit https://github.com/NREL/REopt-API-Analysis/discussions for support with "
-            "common API usage issues. You can also email reopt@nrel.gov with your run_uuid ({}) for support.".format(run_uuid))
+            msg_with_email = (" Please visit https://github.com/NatLabRockies/REopt-Analysis-Scripts/discussions for support with "
+            "common API usage issues. You can also email reopt@nlr.gov with your run_uuid ({}) for support.".format(run_uuid))
         elif user_uuid:
-            msg_with_email = (" Please visit https://github.com/NREL/REopt-API-Analysis/discussions for support with "
-            "common API usage issues. You can also email reopt@nrel.gov with your user_uuid ({}) for support.".format(user_uuid))
+            msg_with_email = (" Please visit https://github.com/NatLabRockies/REopt-Analysis-Scripts/discussions for support with "
+            "common API usage issues. You can also email reopt@nlr.gov with your user_uuid ({}) for support.".format(user_uuid))
         else:
-            msg_with_email = (" Please visit https://github.com/NREL/REopt-API-Analysis/discussions for support with "
-            "common API usage issues. You can also email reopt@nrel.gov for support.")
+            msg_with_email = (" Please visit https://github.com/NatLabRockies/REopt-Analysis-Scripts/discussions for support with "
+            "common API usage issues. You can also email reopt@nlr.gov for support.")
             
         if 'infeasible' not in traceback:
             self.message = message + msg_with_email  # msg_with_email included in messages: error response, but not in error table
