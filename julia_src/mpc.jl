@@ -137,12 +137,6 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     # TODO: show this warning only if tiered rates are detected in the tariff.
     @warn "Using MPC to determine dispatch. MPC does not model: tiered electricity rates; rates will be flattened to the first tier."
 
-    ## Set up MPC inputs
-    # TODO: MPC horizons and timeout are currently hard coded
-    per_iter_timeout_s  = 30.0
-    length_of_data      = 8760 * time_steps_per_hour
-    horizon             = 24 * time_steps_per_hour
-
     # Restrict inputs to PV + ElectricStorage and run a REopt "optimized" sizing pass if sizes are
     # not user-fixed. This mutates `d` to fix the resulting PV/ElectricStorage sizes.
     sized = validate_and_size_pv_storage!(d; solver_name=solver_name,
@@ -154,6 +148,12 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     model_inputs        = sized.model_inputs
     solver_settings     = sized.solver_settings
     time_steps_per_hour = sized.time_steps_per_hour
+
+    ## Set up MPC inputs
+    # TODO: MPC horizons and timeout are currently hard coded
+    per_iter_timeout_s  = 30.0
+    length_of_data      = 8760 * time_steps_per_hour
+    horizon             = 24 * time_steps_per_hour
 
     s = model_inputs.s  # Access the processed Scenario struct
 
