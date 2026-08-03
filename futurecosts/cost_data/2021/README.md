@@ -1,4 +1,4 @@
-## PV Costs from NREL Annual Technology Baseline
+## PV Costs from NLR Annual Technology Baseline
 Steps to create future costs for solar PV systems from the 2020 ATB Data Excel spreadsheet:
 1. Go to the `Solar - PV Dist. Comm` tab
 2. Select `CustomCRP` in the `Choose a Capital Recovery Period (CRP)` box and enter `25` years.
@@ -12,7 +12,7 @@ The values from this process are saved in ATB_2021_PV_costs.csv.
 - Authors: Eric Lantz, Benjamin Sigrin, Michael Gleason, Robert Preus, and Ian Baring-Gould
 - Institution: National Renewable Energy Laboratory
 - Year: 2016
-- URL: https://www.nrel.gov/docs/fy17osti/67337.pdf
+- URL: https://docs.nlr.gov/docs/fy17osti/67337.pdf
 
 ## Battery Costs
 

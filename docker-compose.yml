@@ -7,10 +7,11 @@ services:
       - 6379
 
   db:
-    image: postgres
+    image: postgres:18
     restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql
     environment:
-      - POSTGRES_USER=reopt
       - POSTGRES_PASSWORD=reopt
       - POSTGRES_DB=reopt
     expose:
@@ -20,14 +21,21 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: base-api-image
+    image: base-api-image:latest
     command:  >
       "celery -A reopt_api worker -l info"
     environment:
       - APP_ENV=local
-      - SQL_HOST=db
-      - SQL_PORT=5432
+      - DB_HOST=db
+      - DB_NAME=reopt
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=reopt
       - REDIS_HOST=redis
+      - REDIS_PASSWORD=
+      - NLR_API_KEY
+    env_file:
+      - path: .env
+        required: false
     volumes:
       - .:/opt/reopt
     depends_on:
@@ -36,27 +44,32 @@ services:
       - julia
 
   django:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: base-api-image
+    image: base-api-image:latest
     command:  >
       "python manage.py migrate
       && /opt/reopt/bin/wait-for-it.bash -t 0 julia:8081 -- python manage.py runserver 0.0.0.0:8000"
     environment:
       - APP_ENV=local
-      - SQL_HOST=db
-      - SQL_PORT=5432
+      - DB_HOST=db
+      - DB_NAME=reopt
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=reopt
       - REDIS_HOST=redis
+      - REDIS_PASSWORD=
+      - NLR_API_KEY
+    env_file:
+      - path: .env
+        required: false
     depends_on:
       - db
       - redis
       - julia
+      - celery
     ports:
       - 8000:8000
     volumes:
       - .:/opt/reopt
-  
+
   julia:
     container_name: julia_api
     build:
@@ -71,3 +84,26 @@ services:
       - "8081:8081"
     volumes:
       - ./julia_src:/opt/julia_src
+
+  db-syncer:
+    profiles:
+      - db-syncer
+    build:
+      context: .
+      dockerfile: db-syncer/Dockerfile
+      args:
+        BUNDLE_FROZEN: "false"
+    volumes:
+      - .:/app
+      - ~/.vault-token:/root/.vault-token:ro
+    depends_on:
+      - db
+    environment:
+      - LOAD_VAULT_ENV_SECRETS=true
+      - DEV_DB_HOST=db
+      - DEV_DB_NAME=reopt
+      - DEV_DB_USERNAME=postgres
+      - DEV_DB_PASSWORD=reopt
+
+volumes:
+  postgres_data:

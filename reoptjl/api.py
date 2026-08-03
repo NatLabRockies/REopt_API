@@ -1,4 +1,4 @@
-# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NREL/REopt_API/blob/master/LICENSE.
+# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NatLabRockies/REopt_API/blob/master/LICENSE.
 import json
 import uuid
 import sys
@@ -17,7 +17,7 @@ from reo.exceptions import UnexpectedError, REoptError
 from ghpghx.models import GHPGHXInputs
 from django.core.exceptions import ValidationError
 from reoptjl.models import APIMeta
-import keys
+import keys_env
 log = logging.getLogger(__name__)
  
 
@@ -74,7 +74,7 @@ class Job(ModelResource):
     def obj_create(self, bundle, **kwargs):
         run_uuid = str(uuid.uuid4())
         # Attempt to get POSTed api_key assigned to APIMeta.api_key (or try method below for user_uuid)
-        api_key = keys.developer_nrel_gov_key #bundle.request.GET.get("api_key", "")
+        api_key = keys_env.developer_nrel_gov_key #bundle.request.GET.get("api_key", "")
         if 'user_uuid' in bundle.data.keys():
 
             if type(bundle.data['user_uuid']) == str:
@@ -130,9 +130,9 @@ class Job(ModelResource):
             if bundle.request.META.get('HTTP_X_API_USER_ID', '') == '6f09c972-8414-469b-b3e8-a78398874103':
                 bundle.data['APIMeta']['job_type'] = 'REopt Web Tool'
             else:
-                bundle.data['APIMeta']['job_type'] = 'developer.nrel.gov'
+                bundle.data['APIMeta']['job_type'] = 'developer.nlr.gov'
         else:
-            bundle.data['APIMeta']['job_type'] = 'Internal NREL'
+            bundle.data['APIMeta']['job_type'] = 'Internal NLR'
 
         test_case = bundle.request.META.get('HTTP_USER_AGENT') or ''
         if test_case.startswith('check_http/'):

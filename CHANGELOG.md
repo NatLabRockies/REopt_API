@@ -26,6 +26,37 @@ Classify the change according to the following categories:
     ##### Removed
     ### Patches
 
+
+## v3.20.0
+### Minor Updates
+##### Changed
+- New deployment process to NLR servers, for production API
+- Update PostgreSQL to v18
+- keys.py setup changed to .env for specifying user's NLR_API_KEY
+
+## v3.19.1
+### Patches
+- URL updates due to NREL > NLR name change
+
+## v3.19.0
+### Minor updates
+##### Added 
+- New `CHP` fields **serve_absorption_chiller_only**, **months_serving_absorption_chiller_only**, **follow_electrical_load**, and **include_cooling_in_chp_size**
+- New output `thermal_to_absorption_chiller_series_mmbtu_per_hour` added to heating technologies `CHPOutputs`, `ElectricHeaterOutputs`, `CSTOutputs`, `BoilerOutputs`, `SteamTurbineOutputs`, and `ExistingBoilerOutputs`, and new output `storage_to_absorption_chiller_series_mmbtu_per_hour` for `HotThermalStorageOutputs` and `HighTempThermalStorageOutputs`.  
+##### Changed
+- Default cost values for `CHP`, `AbsorptionChiller`, `SteamTurbine`, `HotThermalStorage`, and `ColdThermalStorage` embedded in the new REopt.jl version.
+- Updated heating dispatch results by separating heat flows to absorption chiller from heating load served (formerly, these were aggregated).
+- Updated `HotThermalStorageOutputs` and `HighTempThermalStorageOutputs` output `storage_to_turbine_series_mmbtu_per_hour` to `storage_to_steamturbine_series_mmbtu_per_hour`
+##### Fixed
+- Fixed a bug in which the CHP system requires a **DomesticHotWater** load.
+- Fixed a bug in which the storage to steam turbine flow was included in the thermal heating load served.
+
+## v3.18.0
+### Minor Updates
+##### Changed
+- refactor docker-compose files so that base-api-image isn't built twice (in celery and django sections), fixing error "image "docker.io/library/base-api-image:latest": already exists"
+- use REopt@0.57.0 (updates to federal sector defaults based on the 2025 NIST Handbook and Annual Supplement; include boiler emissions in emissions calculations)
+
 ## v3.17.5
 ### Minor Updates
 ##### Added

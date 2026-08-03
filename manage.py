@@ -1,10 +1,10 @@
-# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NREL/REopt_API/blob/master/LICENSE.
+# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NatLabRockies/REopt_API/blob/master/LICENSE.
 #!/usr/bin/env python
 import os
 import sys
 
 if __name__ == "__main__":
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "reopt_api.dev_settings")
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "reopt_api.settings")
 
     from django.core.management import execute_from_command_line
 

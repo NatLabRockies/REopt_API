@@ -48,8 +48,8 @@
         "normalize_and_scale_load_profile_input": false
     },
     "Site": {
-        "latitude": 38.96345294964369,
-        "longitude": -77.38406208630109,
+        "latitude": 37.749,
+        "longitude": -122.4194,
         "land_acres": 1.0e5,
         "roof_squarefeet": null,
         "CO2_emissions_reduction_min_fraction": null,

@@ -1,7 +1,7 @@
 # Mac developers: copy this file to your home directory in order to use the Wind Toolkit API
 #  cp .hscfg ~/.hscfg
 
-hs_endpoint = https://developer.nrel.gov/api/hsds
+hs_endpoint = https://developer.nlr.gov/api/hsds
 hs_username = None
 hs_password = None
 hs_api_key = DEMO_KEY

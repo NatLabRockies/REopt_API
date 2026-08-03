@@ -1,4 +1,4 @@
-# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NREL/REopt_API/blob/master/LICENSE.
+# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NatLabRockies/REopt_API/blob/master/LICENSE.
 import sys
 import logging
 import copy
@@ -73,7 +73,7 @@ class ERPMeta(BaseModel, models.Model):
         help_text="The unique ID of a REopt optimization run from which to load inputs."
     )
     job_type = models.TextField(
-        default='developer.nrel.gov'
+        default='developer.nlr.gov'
     )
     status = models.TextField(
         blank=True,
