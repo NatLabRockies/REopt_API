@@ -67,98 +67,6 @@ function generate_pv_production_factors(d::Dict, time_steps_per_hour::Int)
     return Vector{Float64}(pv_production_factor_series)
 end
 
-"""
-    build_mpc_response(status; skip_mpc=false, messages=Dict(), result_dict=Dict())
-
-Build a consistent MPC response envelope with status, version info, and messages.
-Ensures all response paths (success, error, skip) have uniform structure.
-"""
-function build_mpc_response(status::String; skip_mpc=false, messages=Dict(), result_dict=Dict())
-    response = Dict(
-        "status" => status,
-        "reopt_version" => string(pkgversion(reoptjl)),
-        "Messages" => messages,
-        "skip_mpc" => skip_mpc,
-    )
-    # Merge result data if provided (for success case)
-    return merge(response, result_dict)
-end
-
-"""
-    get_technology_sizes!(d::Dict, model_inputs::reoptjl.REoptInputs, solver_settings::Dict)
-
-Determine PV and ElectricStorage sizes for the MPC loop. If min_kw != max_kw and/or min_kwh != max_kwh,
-call REopt to size technologies. User input battery sizes must also be greater than zero.
-    d is mutated in-place to update PV and ElectricStorage sizes.
-    model_inputs has already been processed to remove inputs not used in REopt.jl
-"""
-function get_technology_sizes!(d::Dict, model_inputs::reoptjl.REoptInputs, solver_settings::Dict) 
-    # pv and batt are updated in-place from the dictionary `d` and used in the final REopt run
-    pv   = get!(d, "PV", Dict())
-    batt = get!(d, "ElectricStorage", Dict())
-
-    function is_fixed(dct, lo_key, hi_key)
-        lo = get(dct, lo_key, nothing)
-        hi = get(dct, hi_key, nothing)
-        return lo !== nothing && hi !== nothing && Float64(lo) == Float64(hi)
-    end
-
-    # Check storage sizes are greater than zero
-    if Float64(get(batt, "max_kw",  1.0)) <= 0.0 || Float64(get(batt, "max_kwh", 1.0)) <= 0.0
-        error("ElectricStorage max_kw and max_kwh must both be greater than zero " *
-              "to run the daily_foresight_optimized dispatch option.")
-    end
-
-    # Check if both PV and BESS sizes fixed
-    pv_fixed   = is_fixed(pv,   "min_kw",  "max_kw")
-    batt_fixed = is_fixed(batt, "min_kw",  "max_kw") &&
-                 is_fixed(batt, "min_kwh", "max_kwh")
-
-    if pv_fixed && batt_fixed
-        pv_kw    = Float64(pv["min_kw"])
-        batt_kw  = Float64(batt["min_kw"])
-        batt_kwh = Float64(batt["min_kwh"])
-        return (pv_kw = pv_kw, batt_kw = batt_kw, batt_kwh = batt_kwh, skip_mpc = false, pv_production_factor_series = nothing)
-    end
-
-    @info "MPC: PV and/or ElectricStorage sizes are not specified — running REopt sizing first."
-    # TODO: Should we "remove tiers" here for sizing or allow for optimizing with tiers? 
-
-    m = get_solver_model(get_solver_model_type(solver_settings["solver_name"]), solver_settings["solver_attributes"])
-
-    sizing_results = reoptjl.run_reopt(m, model_inputs)
-
-    if get(sizing_results, "status", "") != "optimal"
-        status = get(sizing_results, "status", "unknown")
-        msgs = get(sizing_results, "Messages", Dict())
-        errs = get(msgs, "errors", [])
-        warns = get(msgs, "warnings", [])
-        error("MPC sizing pre-step did not solve (status = $(status)). " *
-              "REopt errors: $(errs). REopt warnings: $(warns).")
-    end
-
-    pv_kw    = Float64(get(get(sizing_results, "PV", Dict()), "size_kw", 0.0))
-    batt_kw  = Float64(get(get(sizing_results, "ElectricStorage", Dict()), "size_kw", 0.0))
-    batt_kwh = Float64(get(get(sizing_results, "ElectricStorage", Dict()), "size_kwh", 0.0))
-    pv_production_factor_series = get(get(sizing_results, "PV", Dict()), "production_factor_series", nothing)
-
-    # Skip the MPC loop if no battery is sized
-    if batt_kw <= 0.0 || batt_kwh <= 0.0
-        return (pv_kw = pv_kw, batt_kw = 0.0, batt_kwh = 0.0, skip_mpc = true, pv_production_factor_series = pv_production_factor_series)
-    end
-
-    # Fix inputs for final REopt run in http.jl
-    pv["min_kw"]    = pv_kw
-    pv["max_kw"]    = pv_kw
-    batt["min_kw"]  = batt_kw
-    batt["max_kw"]  = batt_kw
-    batt["min_kwh"] = batt_kwh
-    batt["max_kwh"] = batt_kwh
-
-    @info "MPC: REopt sizing solved with PV = $(pv_kw) kW and battery = $(batt_kw) kW / $(batt_kwh) kWh."
-    return (; pv_kw, batt_kw, batt_kwh, skip_mpc = false, pv_production_factor_series)
-end
-
 function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     """
     Run a full-year rolling-horizon MPC dispatch for PV + ElectricStorage by 
@@ -171,7 +79,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     - status: "optimal", "error", or "skipped"
     - reopt_version: Version of REopt.jl used
     - Messages: Dict with optional errors, warnings, or info
-    - skip_mpc: Boolean indicating if MPC was skipped
+    - skip_heuristic_dispatch: Boolean indicating if MPC was skipped
     
     For "optimal" status, also includes:
     - MPC: Metadata (time_steps_per_hour, horizon_time_steps)
@@ -184,40 +92,6 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
       per-timestep energy/export series, and peak demands by month/ratchet
 
     """
-
-    ## Validation on allowable inputs for MPC ##
-    # Error if any techs other than PV and ElectricStorage are provided
-    mpc_allowed_keys = Set(["PV", "ElectricStorage", "ElectricLoad", "ElectricTariff", "ElectricUtility", "Site", "Settings", "Financial"])
-    unsupported_keys = setdiff(keys(d), mpc_allowed_keys)
-    # Ignore disallowed technologies that are explicitly disabled with max_kw = 0.
-    for key in copy(unsupported_keys)
-        val = get(d, key, nothing)
-        if val isa AbstractDict && haskey(val, "max_kw") && val["max_kw"] == 0
-            setdiff!(unsupported_keys, [key])
-        end
-    end
-    if !isempty(unsupported_keys)
-        return build_mpc_response(
-            "error",
-            messages = Dict("errors" => ["When using MPC (daily_foresight_optimized dispatch), only PV and ElectricStorage are supported technologies. " *
-                                        "Unsupported inputs found: $(join(unsupported_keys, ", "))."])
-        )
-    end
-
-    # MPC only supports a single PV, so error on multiple PVs and normalize a one-element array down to a Dict so downstream code can treat d["PV"] as a Dict.
-    # TODO: Handle multiple PVs
-    if haskey(d, "PV") && isa(d["PV"], AbstractArray)
-        if length(d["PV"]) > 1
-            return build_mpc_response(
-                "error",
-                messages = Dict("errors" => ["MPC: Multiple PV systems are not supported in MPC runs at this time."])
-            )
-        elseif length(d["PV"]) == 1
-            d["PV"] = d["PV"][1]
-        else
-            delete!(d, "PV")  # empty PV array -> treat as no PV
-        end
-    end
 
     # The checks below are removed because when MPC is called through REopt, the last REopt run will error if these goals are not met. 
     # If MPC is called directly, specifying these inputs IS an issue (because they're not consdired in MPC dispatch). If the MPC endpoint becomes public, we should re-enable these checks.
@@ -238,7 +112,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
 
     # Error for off-grid runs
     if haskey(d, "Settings") && get(d["Settings"], "off_grid_flag", false) == true
-        return build_mpc_response(
+        return build_dispatch_response(
             "error",
             messages = Dict("errors" => ["MPC: Off-grid runs are not currently supported in MPC."])
         )
@@ -248,13 +122,13 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     if (haskey(d["ElectricTariff"], "demand_lookback_months") && length(d["ElectricTariff"]["demand_lookback_months"]) > 0 ) ||
         (haskey(d["ElectricTariff"], "demand_lookback_percent") && d["ElectricTariff"]["demand_lookback_percent"] > 0) || 
         (haskey(d["ElectricTariff"], "demand_lookback_range") && d["ElectricTariff"]["demand_lookback_range"] > 0)
-            return build_mpc_response(
+            return build_dispatch_response(
                 "error",
                 messages = Dict("errors" => ["MPC: ElectricTariff with demand lookbacks is not currently supported in MPC runs."])
             )
     end
     if haskey(d["ElectricTariff"], "coincident_peak_load_active_time_steps") && d["ElectricTariff"]["coincident_peak_load_active_time_steps"] != [Int64[]]
-        return build_mpc_response(
+        return build_dispatch_response(
             "error",
             messages = Dict("errors" => ["MPC: ElectricTariff with coincident peak charges is not currently supported in MPC runs."])
         )
@@ -263,63 +137,31 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     # TODO: show this warning only if tiered rates are detected in the tariff.
     @warn "Using MPC to determine dispatch. MPC does not model: tiered electricity rates; rates will be flattened to the first tier."
 
-    ## Set up MPC inputs ##
-
+    ## Set up MPC inputs
     # TODO: MPC horizons and timeout are currently hard coded
-    settings = get!(d, "Settings", Dict())
-    time_steps_per_hour = Int(get(settings, "time_steps_per_hour", 1))
+    per_iter_timeout_s  = 30.0
     length_of_data      = 8760 * time_steps_per_hour
     horizon             = 24 * time_steps_per_hour
-    per_iter_timeout_s  = 30.0
 
-    # Update sizing_post to remove solver settings and dispatch inputs, to be able to validate inputs using REoptInputs
-    sizing_post = deepcopy(d)
-    settings = get(sizing_post, "Settings", Dict())
-    solver_settings=Dict()
-    delete!(settings, "run_bau")  # Remove run_bau from sizing run
-    solver_settings["timeout_seconds"] = pop!(settings, "timeout_seconds", 600) # only gets used in sizing run. 
-	solver_settings["optimality_tolerance"] = pop!(settings, "optimality_tolerance", 0.001) # Update to a higher value if solve time becomes an issue
-    solver_settings["solver_attributes"] = SolverAttributes(solver_settings["timeout_seconds"], solver_settings["optimality_tolerance"])
-    solver_settings["solver_name"] = solver_name
-    # Delete inputs specific to the heuristic battery dispatch run
-    if haskey(sizing_post, "ElectricStorage")
-        delete!(sizing_post["ElectricStorage"], "dispatch_strategy")
-        delete!(sizing_post["ElectricStorage"], "fixed_soc_series_fraction")
+    # Restrict inputs to PV + ElectricStorage and run a REopt "optimized" sizing pass if sizes are
+    # not user-fixed. This mutates `d` to fix the resulting PV/ElectricStorage sizes.
+    sized = validate_and_size_pv_storage!(d; solver_name=solver_name,
+                                          strategy_label="MPC (daily_foresight_optimized dispatch)")
+    if sized.error !== nothing
+        return sized.error
     end
+    technology_sizes    = sized.technology_sizes
+    model_inputs        = sized.model_inputs
+    solver_settings     = sized.solver_settings
+    time_steps_per_hour = sized.time_steps_per_hour
 
-    # Process and validate inputs using REoptInputs
-    model_inputs = nothing
-    try
-        model_inputs = reoptjl.REoptInputs(sizing_post)
-
-        # REoptInputs returns an error Dict (rather than throwing) when input validation fails.
-        # Surface those messages instead of falling through to get_technology_sizes!, which expects a REoptInputs and would otherwise raise a confusing MethodError.
-        if isa(model_inputs, Dict)
-            @error "REopt input validation failed during MPC pre-solve." messages=get(model_inputs, "Messages", Dict())
-            return build_mpc_response(
-                "error",
-                messages = get(model_inputs, "Messages", Dict("errors" => ["REopt input validation failed."]))
-            )
-        else
-            @info "Successfully processed REopt inputs."
-        end 
-    catch e
-        @error "Something went wrong during REopt inputs processing!" exception=(e, catch_backtrace())
-        return build_mpc_response(
-            "error",
-            messages = Dict("errors" => [sprint(showerror, e)])
-        )
-    end
-
-    # MPC requires fixed PV and battery sizes. If not provided, call REopt first in a sizing run.
-    technology_sizes = get_technology_sizes!(d, model_inputs, solver_settings)
     s = model_inputs.s  # Access the processed Scenario struct
 
     # Skip MPC if no battery is optimally sized
-    if technology_sizes.skip_mpc
-        return build_mpc_response(
+    if technology_sizes.skip_heuristic_dispatch
+        return build_dispatch_response(
             "skipped",
-            skip_mpc = true,
+            skip_heuristic_dispatch = true,
             messages = Dict("info" => ["No battery was optimally sized in REopt pre-step; MPC dispatch not needed."])
         )
     end
@@ -432,7 +274,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
         ),
     )
     energy_cost_series = Float64[]      # grid purchase (energy) charges per timestep
-    export_benefit_series = Float64[]     # NEM/WHL export credits per timestep (positive = revenue)
+    export_benefit_series = Float64[]   # NEM/WHL export credits per timestep (positive = revenue)
     total_energy_cost = 0.0
     total_export_benefit = 0.0
     soc_init_frac = soc_0
@@ -593,7 +435,7 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     tou_demand_cost_total = n_tou_ratchets > 0 ?
                             sum(tou_previous_peak_demands .* tou_demand_rates) : 0.0
 
-    return build_mpc_response(
+    return build_dispatch_response(
         "optimal",
         result_dict = Dict(
             "MPC" => Dict(

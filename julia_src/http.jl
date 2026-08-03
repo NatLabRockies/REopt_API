@@ -8,6 +8,7 @@ DotEnv.load!()
 const test_nrel_developer_api_key = ENV["NREL_DEVELOPER_API_KEY"]
 
 ENV["NREL_DEVELOPER_EMAIL"] = "reopt@nlr.gov"
+include("heuristic_dispatch_sizing.jl")
 include("mpc.jl")
 
 include("os_solvers.jl")
@@ -74,20 +75,23 @@ function reopt(req::HTTP.Request)
                 Specify Settings.solver_name = 'HiGHS' or 'Cbc' or 'SCIP'"
     end
 
-    # ---- API-only battery heuristic dispatch strategy: "daily_foresight_optimized" ----
-    # When ElectricStorage.dispatch_strategy == "daily_foresight_optimized", if needed, first run REopt to get optimal sizing of PV and battery.
-    # Then run the MPC rolling-horizon loop to get a SOC profile (skip MPC dispatch if optimal battery size is 0).
-    # Then set ElectricStorage.fixed_soc_series_fraction = MPC SOC and fix PV and BESS sizing before running the main REopt optimization.  
+    # When ElectricStorage.dispatch_strategy == "daily_foresight_optimized", "peak_shaving_look_ahead", "peak_shaving_look_behind", or 
+    # "self_consumption", if needed, first run REopt to get optimal sizing of PV and battery. Fix PV and battery sizing before running 
+    # the main REopt optimization (skipping heuristic dispatch if optimal battery size is 0).
+    # For ElectricStorage.dispatch_strategy == daily_foresight_optimized and non-zero battery sizing, run the MPC rolling-horizon loop 
+    # first to get an SOC profile and set ElectricStorage.fixed_soc_series_fraction = MPC SOC.   
     electric_storage = get(d, "ElectricStorage", Dict())
-    if get(electric_storage, "dispatch_strategy", nothing) == "daily_foresight_optimized"
+    dispatch_strategy = get(electric_storage, "dispatch_strategy", nothing)
+    sam_dispatch_strategies = ("peak_shaving_look_ahead", "peak_shaving_look_behind", "self_consumption")
+
+    if dispatch_strategy == "daily_foresight_optimized"
         try
             @info "Running MPC to obtain daily foresight optimized battery dispatch profile."
             mpc_results = get_mpc_results!(d; solver_name=solver_name)
-            # TODO: Cache sizing run results and avoid a second call to REopt? Are those the same results?
             if get(mpc_results, "status", "") == "error"
                 @error "MPC pre-solve failed input validation" messages=get(mpc_results, "Messages", Dict())
                 return HTTP.Response(400, JSON.json(mpc_results))
-            elseif get(mpc_results, "skip_mpc", false) == true
+            elseif get(mpc_results, "skip_heuristic_dispatch", false) == true
                 @info "Cannot execute daily_foresight_optimized battery dispatch because optimal battery size is 0. Setting dispatch strategy to 'optimized'."
                 d["ElectricStorage"]["dispatch_strategy"] = "optimized"
             else
@@ -99,6 +103,30 @@ function reopt(req::HTTP.Request)
             @error "MPC pre-solve failed" exception=(e, catch_backtrace())
             return HTTP.Response(500, JSON.json(Dict(
                 "error" => "MPC pre-solve failed: " * sprint(showerror, e),
+                "reopt_version" => string(pkgversion(reoptjl)),
+            )))
+        end
+    elseif dispatch_strategy in sam_dispatch_strategies
+        try
+            @info "Running REopt sizing to fix PV/ElectricStorage sizes for the '$(dispatch_strategy)' dispatch strategy."
+            sized = validate_and_size_pv_storage!(d; solver_name=solver_name,
+                                                  strategy_label="the '$(dispatch_strategy)' dispatch strategy")
+            if sized.error !== nothing
+                @error "Sizing pre-solve failed input validation" messages=get(sized.error, "Messages", Dict())
+                return HTTP.Response(400, JSON.json(sized.error))
+            elseif sized.technology_sizes.skip_heuristic_dispatch
+                @info "Optimal battery size is 0 for the '$(dispatch_strategy)' dispatch strategy. Setting dispatch strategy to 'optimized'."
+                d["ElectricStorage"]["dispatch_strategy"] = "optimized"
+            elseif dispatch_strategy == "self_consumption" &&
+                   Float64(get(get(d, "PV", Dict()), "existing_kw", 0.0)) + sized.technology_sizes.pv_kw <= 0.0
+                @info "The self_consumption dispatch strategy requires PV, but total PV size is 0. Setting dispatch strategy to 'optimized'."
+                d["ElectricStorage"]["dispatch_strategy"] = "optimized"
+            end
+            # else: PV/ElectricStorage sizes are fixed in d; keep dispatch_strategy for the main run
+        catch e
+            @error "Sizing pre-solve failed" exception=(e, catch_backtrace())
+            return HTTP.Response(500, JSON.json(Dict(
+                "error" => "Sizing pre-solve failed: " * sprint(showerror, e),
                 "reopt_version" => string(pkgversion(reoptjl)),
             )))
         end
