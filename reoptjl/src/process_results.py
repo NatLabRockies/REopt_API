@@ -171,7 +171,15 @@ def update_inputs_in_database(inputs_to_update: dict, run_uuid: str) -> None:
             ASHPWaterHeaterInputs.objects.filter(meta__run_uuid=run_uuid).update(**inputs_to_update["ASHPWaterHeater"])
         if inputs_to_update["PV"]:
             prune_update_fields(PVInputs, inputs_to_update["PV"])
-            PVInputs.objects.filter(meta__run_uuid=run_uuid).update(**inputs_to_update["PV"])  
+            if isinstance(inputs_to_update["PV"], dict):
+                PVInputs.objects.filter(meta__run_uuid=run_uuid).update(**inputs_to_update["PV"])
+            elif isinstance(inputs_to_update["PV"], list):
+                for pv_input in inputs_to_update["PV"]:
+                    prune_update_fields(PVInputs, pv_input)
+                    name = pv_input.get("name")
+                    if not name:
+                        raise ValueError(f"PV list item missing required 'name' field for update. Cannot update all PV rows without identifying specific PV.")
+                    PVInputs.objects.filter(meta__run_uuid=run_uuid, name=name).update(**pv_input)  
         if inputs_to_update["Wind"]:
             prune_update_fields(WindInputs, inputs_to_update["Wind"])
             WindInputs.objects.filter(meta__run_uuid=run_uuid).update(**inputs_to_update["Wind"])  
