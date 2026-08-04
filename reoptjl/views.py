@@ -254,8 +254,16 @@ def results(request, run_uuid):
     try: r["inputs"]["ProcessHeatLoad"] = meta.ProcessHeatLoadInputs.dict
     except: pass
 
-    try: r["inputs"]["CHP"] = meta.CHPInputs.dict
-    except: pass
+    try:
+        chps = meta.CHPInputs.all()
+        if len(chps) == 1:
+            r["inputs"]["CHP"] = chps[0].dict
+        elif len(chps) > 1:
+            r["inputs"]["CHP"] = []
+            for chp in chps:
+                r["inputs"]["CHP"].append(chp.dict)
+    except:
+        pass
 
     try: r["inputs"]["AbsorptionChiller"] = meta.AbsorptionChillerInputs.dict
     except: pass
@@ -340,8 +348,16 @@ def results(request, run_uuid):
         except: pass
         try: r["outputs"]["ColdThermalStorage"] = meta.ColdThermalStorageOutputs.dict
         except: pass
-        try: r["outputs"]["CHP"] = meta.CHPOutputs.dict
-        except: pass
+        try:
+            chps = meta.CHPOutputs.all()
+            if len(chps) == 1:
+                r["outputs"]["CHP"] = chps[0].dict
+            elif len(chps) > 1:
+                r["outputs"]["CHP"] = []
+                for chp in chps:
+                    r["outputs"]["CHP"].append(chp.dict)
+        except:
+            pass
         try: r["outputs"]["AbsorptionChiller"] = meta.AbsorptionChillerOutputs.dict
         except: pass
         try: r["outputs"]["HeatingLoad"] = meta.HeatingLoadOutputs.dict
@@ -1366,23 +1382,26 @@ def queryset_for_summary(api_metas,summary_dict:dict):
     # assumes run_uuids exist in both CHPInputs and CHPOutputs
     chpInputs = CHPInputs.objects.filter(meta__run_uuid__in=run_uuids).only(
             'meta__run_uuid',
+            'name',
             'thermal_efficiency_full_load'
     )
     thermal_efficiency_full_load = dict()
     if len(chpInputs) > 0:
         for m in chpInputs:
-            thermal_efficiency_full_load[str(m.meta.run_uuid)] = m.thermal_efficiency_full_load
+            thermal_efficiency_full_load[(str(m.meta.run_uuid), m.name)] = m.thermal_efficiency_full_load
     
     chpOutputs = CHPOutputs.objects.filter(meta__run_uuid__in=run_uuids).only(
             'meta__run_uuid',
+            'name',
             'size_kw'
     )
     if len(chpOutputs) > 0:
         for m in chpOutputs:
-            if thermal_efficiency_full_load[str(m.meta.run_uuid)] == 0:
-                summary_dict[str(m.meta.run_uuid)]['prime_gen_kw'] = m.size_kw
+            rte = thermal_efficiency_full_load.get((str(m.meta.run_uuid), m.name))
+            if rte == 0:
+                summary_dict[str(m.meta.run_uuid)]['prime_gen_kw'] = (summary_dict[str(m.meta.run_uuid)].get('prime_gen_kw') or 0) + (m.size_kw or 0)
             else:
-                summary_dict[str(m.meta.run_uuid)]['chp_kw'] = m.size_kw
+                summary_dict[str(m.meta.run_uuid)]['chp_kw'] = (summary_dict[str(m.meta.run_uuid)].get('chp_kw') or 0) + (m.size_kw or 0)
     
     ghpOutputs = GHPOutputs.objects.filter(meta__run_uuid__in=run_uuids).only(
             'meta__run_uuid',

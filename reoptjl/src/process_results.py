@@ -64,7 +64,11 @@ def process_results(results: dict, run_uuid: str) -> None:
             if "CoolingLoad" in results.keys():
                 CoolingLoadOutputs.create(meta=meta, **results["CoolingLoad"]).save()
             if "CHP" in results.keys():
-                CHPOutputs.create(meta=meta, **results["CHP"]).save()
+                if isinstance(results["CHP"], dict):
+                    CHPOutputs.create(meta=meta, **results["CHP"]).save()
+                elif isinstance(results["CHP"], list):
+                    for chpdict in results["CHP"]:
+                        CHPOutputs.create(meta=meta, **chpdict).save()
             if "AbsorptionChiller" in results.keys():
                 AbsorptionChillerOutputs.create(meta=meta, **results["AbsorptionChiller"]).save()
             if "Outages" in results.keys():
@@ -134,10 +138,22 @@ def update_inputs_in_database(inputs_to_update: dict, run_uuid: str) -> None:
         if inputs_to_update["Site"]:
             SiteInputs.objects.filter(meta__run_uuid=run_uuid).update(**inputs_to_update["Site"])
 
-        if inputs_to_update["CHP"]:  # Will be an empty dictionary if CHP is not considered
-            if inputs_to_update["CHP"].get("installed_cost_per_kw") and type(inputs_to_update["CHP"].get("installed_cost_per_kw")) == float:
-                inputs_to_update["CHP"]["installed_cost_per_kw"] = [inputs_to_update["CHP"]["installed_cost_per_kw"]]
-            CHPInputs.objects.filter(meta__run_uuid=run_uuid).update(**inputs_to_update["CHP"])
+        if inputs_to_update["CHP"]:  # Will be an empty dictionary/list if CHP is not considered
+            if isinstance(inputs_to_update["CHP"], dict):
+                if inputs_to_update["CHP"].get("installed_cost_per_kw") and type(inputs_to_update["CHP"].get("installed_cost_per_kw")) == float:
+                    inputs_to_update["CHP"]["installed_cost_per_kw"] = [inputs_to_update["CHP"]["installed_cost_per_kw"]]
+                prune_update_fields(CHPInputs, inputs_to_update["CHP"])
+                CHPInputs.objects.filter(meta__run_uuid=run_uuid).update(**inputs_to_update["CHP"])
+            elif isinstance(inputs_to_update["CHP"], list):
+                for chp_input in inputs_to_update["CHP"]:
+                    if chp_input.get("installed_cost_per_kw") and type(chp_input.get("installed_cost_per_kw")) == float:
+                        chp_input["installed_cost_per_kw"] = [chp_input["installed_cost_per_kw"]]
+                    prune_update_fields(CHPInputs, chp_input)
+                    name = chp_input.get("name")
+                    if name:
+                        CHPInputs.objects.filter(meta__run_uuid=run_uuid, name=name).update(**chp_input)
+                    else:
+                        CHPInputs.objects.filter(meta__run_uuid=run_uuid).update(**chp_input)
         if inputs_to_update["SteamTurbine"]:  # Will be an empty dictionary if SteamTurbine is not considered
             SteamTurbineInputs.objects.filter(meta__run_uuid=run_uuid).update(**inputs_to_update["SteamTurbine"])
         if inputs_to_update["GHP"]:

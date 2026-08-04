@@ -89,6 +89,7 @@ class InputValidator(object):
             CSTInputs
         )
         self.pvnames = []
+        self.chpnames = []
         on_grid_required_object_names = [
             "Site", "ElectricLoad", "ElectricTariff"
         ]
@@ -105,12 +106,19 @@ class InputValidator(object):
         for obj in self.objects:
             if obj == APIMeta: continue  # already created and saved
             if obj.key in raw_inputs.keys():
-                if isinstance(raw_inputs[obj.key], list) and obj.key == "PV":  # only handle array of PV
-                    for (i, user_pv) in enumerate(raw_inputs["PV"]):
-                        name = user_pv.get("name", "")
-                        self.pvnames.append(name if not name == "" else "PV" + str(i))
-                        filtered_user_post[self.pvnames[-1]] = scrub_fields(obj, user_pv)
-                        self.models[self.pvnames[-1]] = obj.create(meta=meta, **filtered_user_post[self.pvnames[-1]])
+                if isinstance(raw_inputs[obj.key], list) and obj.key in ["PV", "CHP"]:
+                    # only PV and CHP can be arrays of technology objects
+                    for (i, user_tech) in enumerate(raw_inputs[obj.key]):
+                        name = user_tech.get("name", "")
+                        tech_name = name if not name == "" else obj.key + str(i)
+                        if obj.key == "PV":
+                            self.pvnames.append(tech_name)
+                        else:
+                            self.chpnames.append(tech_name)
+                            if name == "":
+                                user_tech["name"] = tech_name
+                        filtered_user_post[tech_name] = scrub_fields(obj, user_tech)
+                        self.models[tech_name] = obj.create(meta=meta, **filtered_user_post[tech_name])
                 else:
                     filtered_user_post[obj.key] = scrub_fields(obj, raw_inputs[obj.key])
                     self.models[obj.key] = obj.create(meta=meta, **filtered_user_post[obj.key])
@@ -151,7 +159,7 @@ class InputValidator(object):
             if "ElectricUtility" in self.models.keys():
                 msg_dict["ignored inputs"] = ("ElectricUtility inputs are not applicable when off_grid_flag is true, and will be ignored. "
                                 "Provided ElectricUtility can be removed from inputs")
-            msg_dict["info"] = ("When off_grid_flag is true, only PV, Wind, ElectricStorage, Generator technologies can be modeled.")
+            msg_dict["info"] = ("When off_grid_flag is true, only PV, Wind, ElectricStorage, Generator, CHP technologies can be modeled.")
         return msg_dict
 
     @property
@@ -164,11 +172,11 @@ class InputValidator(object):
         """
         d = dict()
         for model in self.models.values():
-            if model.key == "PV" and self.pvnames:
-                if "PV" not in d.keys():
-                    d["PV"] = [{k: v for (k, v) in model.dict.items() if v not in [None, []]}]
+            if model.key in ["PV", "CHP"] and (self.pvnames if model.key == "PV" else self.chpnames):
+                if model.key not in d.keys():
+                    d[model.key] = [{k: v for (k, v) in model.dict.items() if v not in [None, []]}]
                 else:
-                    d["PV"].append({k: v for (k, v) in model.dict.items() if v not in [None, []]})
+                    d[model.key].append({k: v for (k, v) in model.dict.items() if v not in [None, []]})
             else:
                 d[model.key] = {k: v for (k, v) in model.dict.items() if v not in [None, []]}
                 # cleaning out model attribute
@@ -271,6 +279,27 @@ class InputValidator(object):
             for pvname in self.pvnames:
                 cross_clean_pv(self.models[pvname])
                 update_pv_defaults_offgrid(self, self.models[pvname])
+
+        """
+        CHP validation
+        """
+        def cross_clean_chp(chpmodel_key):
+            if len(self.models[chpmodel_key].production_factor_series) > 0:
+                self.clean_time_series(chpmodel_key, "production_factor_series")
+
+            if self.models["Settings"].off_grid_flag:
+                if self.models[chpmodel_key].operating_reserve_required_fraction is None:
+                    self.models[chpmodel_key].operating_reserve_required_fraction = 0.0
+            else:
+                # operating reserve requirement for CHP only applies to off-grid
+                self.models[chpmodel_key].operating_reserve_required_fraction = 0.0
+
+        if "CHP" in self.models.keys():  # single CHP
+            cross_clean_chp("CHP")
+
+        if len(self.chpnames) > 0:  # multiple CHP
+            for chpname in self.chpnames:
+                cross_clean_chp(chpname)
 
         """
         Time series values are up or down sampled to align with Settings.time_steps_per_hour
@@ -540,9 +569,17 @@ class InputValidator(object):
         
         def validate_offgrid_keys(self):
             # From https://github.com/NatLabRockies/REopt.jl/blob/4b0fb7f6556b2b6e9a9a7e8fa65398096fb6610f/src/core/scenario.jl#L88         
-            valid_input_keys_offgrid = ["PV", "Wind", "ElectricStorage", "Generator", "Settings", "Site", "Financial", "ElectricLoad", "ElectricTariff", "ElectricUtility", "Meta"]
+            valid_input_keys_offgrid = ["PV", "Wind", "ElectricStorage", "Generator", "CHP", "Settings", "Site", "Financial", "ElectricLoad", "ElectricTariff", "ElectricUtility", "Meta"]
 
-            invalid_input_keys_offgrid = list(set(list(self.models.keys()))-set(valid_input_keys_offgrid))
+            normalized_model_keys = set(self.models.keys())
+            if len(self.pvnames) > 0:
+                normalized_model_keys -= set(self.pvnames)
+                normalized_model_keys.add("PV")
+            if len(self.chpnames) > 0:
+                normalized_model_keys -= set(self.chpnames)
+                normalized_model_keys.add("CHP")
+
+            invalid_input_keys_offgrid = list(normalized_model_keys - set(valid_input_keys_offgrid))
             if 'APIMeta' in invalid_input_keys_offgrid:
                 invalid_input_keys_offgrid.remove('APIMeta')
 
