@@ -150,10 +150,9 @@ def update_inputs_in_database(inputs_to_update: dict, run_uuid: str) -> None:
                         chp_input["installed_cost_per_kw"] = [chp_input["installed_cost_per_kw"]]
                     prune_update_fields(CHPInputs, chp_input)
                     name = chp_input.get("name")
-                    if name:
-                        CHPInputs.objects.filter(meta__run_uuid=run_uuid, name=name).update(**chp_input)
-                    else:
-                        CHPInputs.objects.filter(meta__run_uuid=run_uuid).update(**chp_input)
+                    if not name:
+                        raise ValueError(f"CHP list item missing required 'name' field for update. Cannot update all CHP rows without identifying specific CHP.")
+                    CHPInputs.objects.filter(meta__run_uuid=run_uuid, name=name).update(**chp_input)
         if inputs_to_update["SteamTurbine"]:  # Will be an empty dictionary if SteamTurbine is not considered
             SteamTurbineInputs.objects.filter(meta__run_uuid=run_uuid).update(**inputs_to_update["SteamTurbine"])
         if inputs_to_update["GHP"]:

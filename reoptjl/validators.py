@@ -108,9 +108,17 @@ class InputValidator(object):
             if obj.key in raw_inputs.keys():
                 if isinstance(raw_inputs[obj.key], list) and obj.key in ["PV", "CHP"]:
                     # only PV and CHP can be arrays of technology objects
+                    seen_names = set()
                     for (i, user_tech) in enumerate(raw_inputs[obj.key]):
                         name = user_tech.get("name", "")
                         tech_name = name if not name == "" else obj.key + str(i)
+                         
+                        # Check for duplicate names within the list
+                        if tech_name in seen_names:
+                            self.validation_errors[obj.key] = f"Duplicate {obj.key} name: '{tech_name}'. All {obj.key} names must be unique."
+                            continue
+                        seen_names.add(tech_name)
+                         
                         if obj.key == "PV":
                             self.pvnames.append(tech_name)
                         else:
