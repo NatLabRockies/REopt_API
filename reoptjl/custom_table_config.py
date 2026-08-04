@@ -805,6 +805,12 @@ custom_table_webtool = [
         "scenario_value": lambda df: safe_get(df, "outputs.ElectricStorage.storage_to_load_series_kw")
     },
     {
+        "label"         : "Battery Exported to Grid (kWh/yr)",
+        "key"           : "battery_exported_to_grid",
+        "bau_value"     : lambda df: safe_get(df, "outputs.ElectricStorage.storage_to_grid_series_kw_bau"),
+        "scenario_value": lambda df: safe_get(df, "outputs.ElectricStorage.storage_to_grid_series_kw")
+    },
+    {
         "label"         : "Generator Serving Load (kWh/yr)",
         "key"           : "generator_serving_load",
         "bau_value"     : lambda df: safe_get(df, "outputs.Generator.electric_to_load_series_kw_bau"),
