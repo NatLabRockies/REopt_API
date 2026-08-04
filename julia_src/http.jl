@@ -181,13 +181,18 @@ function reopt(req::HTTP.Request)
 			]
             if haskey(d, "CHP")
                 inputs_with_defaults_from_julia_chp = [
+                    :name,
                     :installed_cost_per_kw, :tech_sizes_for_cost_curve, :om_cost_per_kwh, 
                     :electric_efficiency_full_load, :thermal_efficiency_full_load, :min_allowable_kw,
                     :cooling_thermal_factor, :min_turn_down_fraction, :unavailability_periods, :max_kw,
                     :size_class, :electric_efficiency_half_load, :thermal_efficiency_half_load,
                     :macrs_option_years, :macrs_bonus_fraction, :federal_itc_fraction
                 ]
-                chp_dict = Dict(key=>getfield(model_inputs.s.chps[1], key) for key in inputs_with_defaults_from_julia_chp)
+                if length(model_inputs.s.chps) == 1
+                    chp_dict = Dict(key=>getfield(model_inputs.s.chps[1], key) for key in inputs_with_defaults_from_julia_chp)
+                else
+                    chp_dict = [Dict(key=>getfield(chp, key) for key in inputs_with_defaults_from_julia_chp) for chp in model_inputs.s.chps]
+                end
             else
                 chp_dict = Dict()
             end
@@ -253,9 +258,13 @@ function reopt(req::HTTP.Request)
             end
             if haskey(d, "PV")
                 inputs_with_defaults_from_julia_pv = [
-                    :size_class, :installed_cost_per_kw, :om_cost_per_kw, :macrs_option_years, :macrs_bonus_fraction, :federal_itc_fraction
+                    :name, :size_class, :installed_cost_per_kw, :om_cost_per_kw, :macrs_option_years, :macrs_bonus_fraction, :federal_itc_fraction
                 ]
-                pv_dict = Dict(key=>getfield(model_inputs.s.pvs[1], key) for key in inputs_with_defaults_from_julia_pv)
+                if length(model_inputs.s.pvs) == 1
+                    pv_dict = Dict(key=>getfield(model_inputs.s.pvs[1], key) for key in inputs_with_defaults_from_julia_pv)
+                else
+                    pv_dict = [Dict(key=>getfield(pv, key) for key in inputs_with_defaults_from_julia_pv) for pv in model_inputs.s.pvs]
+                end
             else
                 pv_dict = Dict()
             end   
