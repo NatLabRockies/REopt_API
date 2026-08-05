@@ -4726,6 +4726,12 @@ class CHPInputs(BaseModel, models.Model):
         blank=True,
         help_text="Boolean indicator if CHP follows the electrical load by running at capacity or meeting the load only"   
     )
+    follow_heating_load = models.BooleanField(
+        default=False,
+        null=True, 
+        blank=True,
+        help_text="Boolean indicator if CHP follows the heating load by running at capacity or meeting the load only"
+    )
     can_serve_dhw = models.BooleanField(
         default=True,
         null=True, 
