@@ -213,6 +213,12 @@ function get_mpc_results!(d::Dict; solver_name::String="HiGHS")::Dict
     co2_grid_emissions_series = Float64.(s.electric_utility.emissions_factor_series_lb_CO2_per_kwh)
 
     # --- Export / net metering setup (mirror the sizing-run scenario) ---
+    # TODO: Consider adding an initial REopt run to determine if the NEM or WHL bin is active 
+    # MPC can currently choose between NEM and WHL for each horizon instead of once for the year.
+    # This is not an issue if the fixed PV size > NEM limit (check implemented in REopt.jl) 
+    # Issue occurs for edge cases where fixed PV size < NEM limit and wholesale rates are more 
+    # lucrative than NEM compensation.
+    
     # NEM is enabled in MPC when ElectricUtility.net_metering_limit_kw > 0.
     nm_limit_kw = Float64(s.electric_utility.net_metering_limit_kw)
 
