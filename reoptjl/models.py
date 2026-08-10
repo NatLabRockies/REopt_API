@@ -5077,6 +5077,14 @@ class CHPOutputs(BaseModel, models.Model):
         null=True, blank=True,
         help_text="Thermal energy produced in a year by the existing CHP system in BAU [MMBtu]"
     )
+    annual_thermal_curtailed_mmbtu = models.FloatField(
+        null=True, blank=True,
+        help_text="Thermal energy wasted/unused/vented in a year [MMBtu]"
+    )
+    annual_thermal_curtailed_mmbtu_bau = models.FloatField(
+        null=True, blank=True,
+        help_text="Thermal energy wasted/unused/vented in a year by the existing CHP system in BAU [MMBtu]"
+    )
     electric_production_series_kw = ArrayField(
         models.FloatField(
             null=True, blank=True
