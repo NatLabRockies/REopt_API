@@ -381,6 +381,8 @@ def results(request, run_uuid):
     
     if meta.status == "error":
         return JsonResponse(r, status=400)
+    if meta.status == "Internal Server Error. See messages for more.":
+        return JsonResponse(r, status=500)
 
     return JsonResponse(r)
 

@@ -26,6 +26,16 @@ Classify the change according to the following categories:
     ##### Removed
     ### Patches
 
+## v3.21.0
+### Minor Updates
+##### Added
+- Added **ElectricStorage** input **dispatch_strategy** to select battery dispatch behavior. Supported values are **optimized** (default), **peak_shaving_look_ahead**, **peak_shaving_look_behind**, **self_consumption**, **backup**, **custom_soc**, and **daily_foresight_optimized**.
+- Added **ElectricStorage** inputs **fixed_soc_series_fraction** and **fixed_soc_series_fraction_tolerance** to constrain the battery state-of-charge time series to user-provided values within an absolute tolerance.
+- Added **ElectricStorage** inputs **can_net_meter**, **can_wholesale**, and **can_export_beyond_nem_limit** to control whether battery exports can receive the corresponding electric tariff compensation. These inputs default to **false**.
+- Added **ElectricStorage** output **storage_to_grid_series_kw** for the battery power exported to the grid in each time step. Annual battery exports are also included in custom results tables as "Battery Exported to Grid (kWh/yr)."
+##### Changed
+- Renamed the **ElectricStorage** output **state_of_health** to **state_of_health_series_fraction**.
+- The default **ElectricStorage** input **soc_min_fraction** is now 0.8 when **dispatch_strategy** is **backup** and remains 0.2 for all other dispatch strategies.
 
 ## v3.20.0
 ### Minor Updates
@@ -40,7 +50,7 @@ Classify the change according to the following categories:
 
 ## v3.19.0
 ### Minor updates
-##### Added 
+#### Added 
 - New `CHP` fields **serve_absorption_chiller_only**, **months_serving_absorption_chiller_only**, **follow_electrical_load**, and **include_cooling_in_chp_size**
 - New output `thermal_to_absorption_chiller_series_mmbtu_per_hour` added to heating technologies `CHPOutputs`, `ElectricHeaterOutputs`, `CSTOutputs`, `BoilerOutputs`, `SteamTurbineOutputs`, and `ExistingBoilerOutputs`, and new output `storage_to_absorption_chiller_series_mmbtu_per_hour` for `HotThermalStorageOutputs` and `HighTempThermalStorageOutputs`.  
 ##### Changed

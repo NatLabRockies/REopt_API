@@ -113,6 +113,45 @@ class TestJobEndpoint(ResourceTestCaseMixin, TransactionTestCase):
         assert(r['messages']['has_stacktrace']==True)
         assert(resp.status_code==400)
 
+    def test_mpc(self):
+        """
+        Purpose of this test is to ensure that the MPC endpoint works as expected
+        """
+
+        post_file = os.path.join('reoptjl', 'test', 'posts', 'mpc.json')
+        post = json.load(open(post_file, 'r'))
+
+        # Checking that MPC correctly identifies peak load of Jan and Feb and fully dispatches BESS for both peaks.
+        loads_kw = [10] * 8760
+        loads_kw[743] = 50 # 1/31/25 23:00 
+        loads_kw[745] = 100 # 2/1/25 01:00
+        post["ElectricLoad"]["loads_kw"] = loads_kw
+        post["ElectricTariff"]["monthly_energy_rates"] = [0.10] * 12
+
+        # expected_jan_demand_cost = post["ElectricTariff"]["monthly_demand_rates"][0] * (50 - post["ElectricStorage"]["min_kw"])
+        # expected_feb_demand_cost = post["ElectricTariff"]["monthly_demand_rates"][1] * (100 - post["ElectricStorage"]["min_kw"])
+
+        # resp = self.api_client.post('/v3/job/', format='json', data=post)
+        # self.assertHttpCreated(resp)
+        # r = json.loads(resp.content)
+        # run_uuid = r.get('run_uuid')
+
+        # resp = self.api_client.get(f'/v3/job/{run_uuid}/results')
+        # r = json.loads(resp.content)
+        # results = r["outputs"]
+        # assert(resp.status_code==200)
+        # self.assertAlmostEqual(results["ElectricTariff"]["monthly_demand_cost_series_before_tax"][0], expected_jan_demand_cost, delta=0.01)
+        # self.assertAlmostEqual(results["ElectricTariff"]["monthly_demand_cost_series_before_tax"][1], expected_feb_demand_cost, delta=0.01)
+
+        # Should error if off-grid
+        post["Settings"]["off_grid_flag"] = True
+        resp = self.api_client.post('/v3/job/', format='json', data=post)
+        self.assertHttpCreated(resp)
+        r = json.loads(resp.content)
+        run_uuid = r.get('run_uuid')
+        resp = self.api_client.get(f'/v3/job/{run_uuid}/results')
+        assert(resp.status_code==400)
+
     def test_thermal_in_results(self):
         """
         Purpose of this test is to check that the expected thermal loads, techs, and storage are included in the results

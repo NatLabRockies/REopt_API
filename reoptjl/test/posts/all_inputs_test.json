@@ -167,6 +167,7 @@
         "internal_efficiency_fraction": 0.975,
         "inverter_efficiency_fraction": 0.96,
         "rectifier_efficiency_fraction": 0.96,
+        "dispatch_strategy": "optimized",
         "soc_min_fraction": 0.2,
         "soc_min_applies_during_outages": true,
         "soc_init_fraction": 0.5,
@@ -187,7 +188,9 @@
         "total_itc_fraction": 0.0,
         "total_rebate_per_kw": 0.0,
         "total_rebate_per_kwh": 0.0,
-        "optimize_soc_init_fraction": false
+        "optimize_soc_init_fraction": false,
+        "fixed_soc_series_fraction": [],
+        "fixed_soc_series_fraction_tolerance": 0.05
     },
     "Generator": {
         "existing_kw": 0.0,

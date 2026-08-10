@@ -3668,6 +3668,16 @@ class ElectricStorageInputs(BaseModel, models.Model):
         primary_key=True
     )
 
+    ELECTRICSTORAGE_DISPATCH_STRATEGY = models.TextChoices('ELECTRICSTORAGE_DISPATCH_STRATEGY', (
+        "optimized",
+        "peak_shaving_look_ahead",
+        "peak_shaving_look_behind",
+        "self_consumption",
+        "backup",
+        "custom_soc",
+        "daily_foresight_optimized"
+    ))
+
     min_kw = models.FloatField(
         default=0,
         validators=[
@@ -3731,8 +3741,14 @@ class ElectricStorageInputs(BaseModel, models.Model):
         blank=True,
         help_text="Battery rectifier efficiency"
     )
+    dispatch_strategy = models.TextField(
+        default=ELECTRICSTORAGE_DISPATCH_STRATEGY.optimized,
+        choices=ELECTRICSTORAGE_DISPATCH_STRATEGY.choices,
+        null=True,
+        blank=True,
+        help_text="Electric storage dispatch strategy can be one of: optimized, peak_shaving_look_ahead, peak_shaving_look_behind, self_consumption, backup, custom_soc, daily_foresight_optimized"
+    )
     soc_min_fraction = models.FloatField(
-        default=0.2,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0)
@@ -3753,9 +3769,47 @@ class ElectricStorageInputs(BaseModel, models.Model):
         blank=True,
         help_text="Battery state of charge at first hour of optimization as fraction of energy capacity."
     )
+    fixed_soc_series_fraction = ArrayField(
+        models.FloatField(
+            validators=[
+                MinValueValidator(0),
+                MaxValueValidator(1)
+            ],
+            blank=True
+        ),
+        default=list, blank=True,
+        help_text=("If provided, SOC (as fraction of total energy capacity) will not be optimized and will instead be fixed to the values provided"
+                   "here +- the absolute fixed_soc_series_fraction_tolerance. Must be an array of values 0-1 with length equal to 8760*time_steps_per_hour.")
+    )
+    fixed_soc_series_fraction_tolerance = models.FloatField(
+        validators=[
+            MinValueValidator(0),
+            MaxValueValidator(1)
+        ],
+        null=True, blank=True,
+        help_text="Absolute tolerance on fixed_soc_series_fraction to avoid infeasible solutions when fixed_soc_series_fraction is provided."
+    )
     can_grid_charge = models.BooleanField(
         blank=True,
         help_text="Flag to set whether the battery can be charged from the grid, or just onsite generation."
+    )
+    can_net_meter = models.BooleanField(
+        default=False,
+        blank=True,
+        help_text=("True/False for if technology has option to participate in net metering agreement with utility. "
+                   "Note that a technology can only participate in either net metering or wholesale rates (not both).")
+    )
+    can_wholesale = models.BooleanField(
+        default=False,
+        blank=True,
+        help_text=("True/False for if technology has option to export energy that is compensated at the wholesale_rate. "
+                   "Note that a technology can only participate in either net metering or wholesale rates (not both).")
+    )
+    can_export_beyond_nem_limit = models.BooleanField(
+        default=False,
+        blank=True,
+        help_text=("True/False for if technology can export energy beyond the annual site load (and be compensated for "
+                   "that energy at the export_rate_beyond_net_metering_limit).")
     )
     installed_cost_per_kw = models.FloatField(
         default=968.0,
@@ -3942,9 +3996,13 @@ class ElectricStorageOutputs(BaseModel, models.Model):
         models.FloatField(null=True, blank=True),
         blank=True, default=list
     )
+    storage_to_grid_series_kw = ArrayField(
+        models.FloatField(null=True, blank=True),
+        blank=True, default=list
+    )
     initial_capital_cost = models.FloatField(null=True, blank=True)
     maintenance_cost = models.FloatField(null=True, blank=True)
-    state_of_health = ArrayField(
+    state_of_health_series_fraction = ArrayField(
         models.FloatField(null=True, blank=True),
         blank=True, default=list
     )
