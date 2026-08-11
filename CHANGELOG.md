@@ -26,6 +26,14 @@ Classify the change according to the following categories:
     ##### Removed
     ### Patches
 
+## v3.22.0
+### Minor Updates
+##### Added
+- Expanded **CHP** modeling to support multiple independently-configured CHPs, existing capacity (i.e. in BAU scenario), off-grid operation including the option for CHP to either require or supply operating reserves, user-defined production factors, ramp-rate limits, and heating load following thermal dispatch.
+- Added **CHP** inputs **name** (to label the type of system you are modeling), **existing_kw**, **ramp_rate_fraction_per_hour**, **operating_reserve_required_fraction**, **production_factor_series**, **fuel_cost_escalation_rate_fraction**, and **follow_heating_load**. When **follow_heating_load** is `true`, each CHP independently follows its eligible heating load at unfired thermal capacity; **ExistingBoiler** is restricted when CHP capacity exceeds that load, while other onsite heating resources can contribute and supplementary firing remains available only as incremental heat.
+- Added **CHP** outputs **name**, **electric_curtailed_series_kw**, and **annual_thermal_curtailed_mmbtu**. Multiple CHP systems are returned as a list of per-unit results under **CHP**, identified by **name**.
+- Added **CHP** BAU outputs **size_kw_bau**, **annual_fuel_consumption_mmbtu_bau**, **annual_electric_production_kwh_bau**, **annual_thermal_production_mmbtu_bau**, **annual_thermal_curtailed_mmbtu_bau**, **year_one_fuel_cost_before_tax_bau**, **year_one_fuel_cost_after_tax_bau**, **lifecycle_fuel_cost_after_tax_bau**, **year_one_standby_cost_before_tax_bau**, **year_one_standby_cost_after_tax_bau**, and **lifecycle_standby_cost_after_tax_bau**.
+
 ## v3.21.0
 ### Minor Updates
 ##### Added
@@ -50,7 +58,7 @@ Classify the change according to the following categories:
 
 ## v3.19.0
 ### Minor updates
-#### Added 
+##### Added 
 - New `CHP` fields **serve_absorption_chiller_only**, **months_serving_absorption_chiller_only**, **follow_electrical_load**, and **include_cooling_in_chp_size**
 - New output `thermal_to_absorption_chiller_series_mmbtu_per_hour` added to heating technologies `CHPOutputs`, `ElectricHeaterOutputs`, `CSTOutputs`, `BoilerOutputs`, `SteamTurbineOutputs`, and `ExistingBoilerOutputs`, and new output `storage_to_absorption_chiller_series_mmbtu_per_hour` for `HotThermalStorageOutputs` and `HighTempThermalStorageOutputs`.  
 ##### Changed
