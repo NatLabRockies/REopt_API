@@ -5,7 +5,7 @@ import REopt as reoptjl  # For REopt.jl, needed because we still have local REop
 using DotEnv
 DotEnv.load!()
 
-const test_nrel_developer_api_key = ENV["NREL_DEVELOPER_API_KEY"]
+const test_nlr_developer_api_key = ENV["NLR_DEVELOPER_API_KEY"]
 
 ENV["NREL_DEVELOPER_EMAIL"] = "reopt@nlr.gov"
 include("heuristic_dispatch_sizing.jl")
@@ -61,9 +61,9 @@ function reopt(req::HTTP.Request)
     d = JSON.parse(String(req.body))
 	error_response = Dict()
     if !isempty(get(d, "api_key", ""))
-        ENV["NREL_DEVELOPER_API_KEY"] = pop!(d, "api_key")
+        ENV["NLR_DEVELOPER_API_KEY"] = pop!(d, "api_key")
     else
-        ENV["NREL_DEVELOPER_API_KEY"] = test_nrel_developer_api_key
+        ENV["NLR_DEVELOPER_API_KEY"] = test_nlr_developer_api_key
         delete!(d, "api_key")
     end
 
@@ -909,9 +909,9 @@ function mpc(req::HTTP.Request)
     results = Dict()
     try
         if !isempty(get(d, "api_key", ""))
-            ENV["NREL_DEVELOPER_API_KEY"] = pop!(d, "api_key")
+            ENV["NLR_DEVELOPER_API_KEY"] = pop!(d, "api_key")
         else
-            ENV["NREL_DEVELOPER_API_KEY"] = test_nrel_developer_api_key
+            ENV["NLR_DEVELOPER_API_KEY"] = test_nlr_developer_api_key
             delete!(d, "api_key")
         end
                
