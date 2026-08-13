@@ -78,6 +78,7 @@ services:
     environment:
       - XPRESS_JL_SKIP_LIB_CHECK=True
       - XPRESS_INSTALLED=False
+      - NLR_API_KEY
     # command: julia --project=/opt/julia_src http.jl
     command: julia --project=. -e 'using Pkg; Pkg.instantiate(); include("http.jl")'
     ports:

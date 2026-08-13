@@ -170,8 +170,8 @@ def update_inputs_in_database(inputs_to_update: dict, run_uuid: str) -> None:
             prune_update_fields(ASHPWaterHeaterInputs, inputs_to_update["ASHPWaterHeater"])
             ASHPWaterHeaterInputs.objects.filter(meta__run_uuid=run_uuid).update(**inputs_to_update["ASHPWaterHeater"])
         if inputs_to_update["PV"]:
-            prune_update_fields(PVInputs, inputs_to_update["PV"])
             if isinstance(inputs_to_update["PV"], dict):
+                prune_update_fields(PVInputs, inputs_to_update["PV"])
                 PVInputs.objects.filter(meta__run_uuid=run_uuid).update(**inputs_to_update["PV"])
             elif isinstance(inputs_to_update["PV"], list):
                 for pv_input in inputs_to_update["PV"]:
