@@ -26,6 +26,11 @@ Classify the change according to the following categories:
     ##### Removed
     ### Patches
 
+## v3.22.1
+### Patches
+- Upgrades solver stack dependencies in Julia environment
+- Updates internally-used developer key environment variables to NLR from NREL for Julia environment
+
 ## v3.22.0
 ### Minor Updates
 ##### Added
