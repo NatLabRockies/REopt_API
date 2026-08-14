@@ -7,7 +7,7 @@ DotEnv.load!()
 
 const test_nlr_developer_api_key = ENV["NLR_DEVELOPER_API_KEY"]
 
-ENV["NREL_DEVELOPER_EMAIL"] = "reopt@nlr.gov"
+ENV["NLR_DEVELOPER_EMAIL"] = "reopt@nlr.gov"
 include("heuristic_dispatch_sizing.jl")
 include("mpc.jl")
 
