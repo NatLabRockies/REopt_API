@@ -26,6 +26,10 @@ Classify the change according to the following categories:
     ##### Removed
     ### Patches
 
+## v3.22.1
+### Patches
+- Update REopt.jl with fix for custom generation profile with production_factor and load-following inputs
+
 ## v3.22.0
 ### Minor Updates
 ##### Added
