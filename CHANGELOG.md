@@ -26,10 +26,14 @@ Classify the change according to the following categories:
     ##### Removed
     ### Patches
 
-## v3.22.1
+## v3.22.2
 ### Patches
 - Upgrades solver stack dependencies in Julia environment
 - Updates internally-used developer key environment variables to NLR from NREL for Julia environment
+
+## v3.22.1
+### Patches
+- Update REopt.jl with fix for custom generation profile with production_factor and load-following inputs
 
 ## v3.22.0
 ### Minor Updates
