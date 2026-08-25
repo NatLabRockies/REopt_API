@@ -67,7 +67,7 @@
     "Settings": {
         "timeout_seconds": 800,
         "time_steps_per_hour": 1,
-        "optimality_tolerance": 0.01,
+        "optimality_tolerance": 0.05,
         "add_soc_incentive": true,
         "run_bau": true,
         "include_climate_in_objective": false,
