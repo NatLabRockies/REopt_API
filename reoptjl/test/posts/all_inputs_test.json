@@ -65,7 +65,7 @@
         "federal_procurement_type": ""
     },
     "Settings": {
-        "timeout_seconds": 420,
+        "timeout_seconds": 800,
         "time_steps_per_hour": 1,
         "optimality_tolerance": 0.01,
         "add_soc_incentive": true,
