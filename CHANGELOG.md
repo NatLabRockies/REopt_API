@@ -26,9 +26,11 @@ Classify the change according to the following categories:
     ##### Removed
     ### Patches
 
-## v3.22.2
-### Patches
-- Upgrades solver stack dependencies in Julia environment
+## v3.23.0
+### Minor Updates
+##### Changed
+- Upgrades Julia environment dependencies
+- Notably updates the solver stack dependencies for which the HiGHS update may affect the optimization algorithm and therefore results
 - Updates internally-used developer key environment variables to NLR from NREL for Julia environment
 
 ## v3.22.1
