@@ -631,7 +631,7 @@ def electric_storage_cost_defaults(request):
 
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
-        debug_msg = "exc_type: {}; exc_value: {}; exc_traceback: {}".format(exc_type, exc_value.args[0],
+        debug_msg = "exc_type: {}; exc_value: {}; exc_traceback: {}".format(str(exc_type), exc_value.args[0],
                                                                             tb.format_tb(exc_traceback))
         log.debug(debug_msg)
         return JsonResponse({"Error": "Unexpected error in electric_storage_cost_defaults endpoint. Check log for more."}, status=500)

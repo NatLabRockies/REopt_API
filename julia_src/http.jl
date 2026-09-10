@@ -278,7 +278,7 @@ function reopt(req::HTTP.Request)
             end     
             if haskey(d, "ElectricStorage")
                 inputs_with_defaults_from_julia_electric_storage = [
-                    :macrs_option_years, :macrs_bonus_fraction, :total_itc_fraction, :internal_efficiency_fraction, :size_class
+                    :macrs_option_years, :macrs_bonus_fraction, :total_itc_fraction, :internal_efficiency_fraction, :size_class, :installed_cost_per_kw, :installed_cost_per_kwh, :installed_cost_constant
                 ]
                 electric_storage_dict = Dict(key=>getfield(model_inputs.s.storage.attr["ElectricStorage"], key) for key in inputs_with_defaults_from_julia_electric_storage)
             else
@@ -914,7 +914,7 @@ function electric_storage_cost_defaults(req::HTTP.Request)
 		response = data
         return HTTP.Response(200, JSON.json(response))
     else
-        @info "An error occured in the electric_storage_cost_defaults endpoint"
+        @info "An error occurred in the electric_storage_cost_defaults endpoint"
         return HTTP.Response(500, JSON.json(error_response))
     end
 end

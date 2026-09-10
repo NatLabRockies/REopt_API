@@ -3671,11 +3671,11 @@ class ElectricStorageInputs(BaseModel, models.Model):
     size_class = models.IntegerField(
         validators=[
             MinValueValidator(1),
-            MaxValueValidator(5)
+            MaxValueValidator(4)
         ],
         null=True,
         blank=True,
-        help_text="ElectricStorage size class. Must be an integer value between 1 and 3. Default is calculated per ratio of annual peak and average load of given load profile."
+        help_text="ElectricStorage size class. Must be an integer value between 1 and 4. Default is calculated per ratio of annual peak and average load of given load profile."
     )
     ELECTRICSTORAGE_DISPATCH_STRATEGY = models.TextChoices('ELECTRICSTORAGE_DISPATCH_STRATEGY', (
         "optimized",
