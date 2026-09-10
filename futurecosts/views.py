@@ -1,4 +1,4 @@
-# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NREL/REopt_API/blob/master/LICENSE.
+# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NatLabRockies/REopt_API/blob/master/LICENSE.
 import uuid
 import sys
 import traceback as tb
@@ -28,7 +28,7 @@ def results(request, run_uuid):
         fcjob.update_status()
         resp_dict = fcjob.dict
         resp_dict["messages"] = [
-            "GET the detailed results for each future_scenarioX_id at developer.nrel.gov/stable/job/<id>/results."
+            "GET the detailed results for each future_scenarioX_id at developer.nlr.gov/stable/job/<id>/results."
         ]
         return JsonResponse(resp_dict)
 

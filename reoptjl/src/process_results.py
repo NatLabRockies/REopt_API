@@ -1,4 +1,4 @@
-# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NREL/REopt_API/blob/master/LICENSE.
+# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NatLabRockies/REopt_API/blob/master/LICENSE.
 from reoptjl.models import FinancialOutputs, APIMeta, PVOutputs, ElectricStorageInputs, ElectricStorageOutputs,\
                         ElectricTariffOutputs, SiteOutputs, ElectricUtilityOutputs,\
                         GeneratorOutputs, ElectricLoadOutputs, WindInputs, WindOutputs, FinancialInputs,\
@@ -104,10 +104,10 @@ def process_results(results: dict, run_uuid: str) -> None:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         debug_msg = "exc_type: {}; exc_value: {}; exc_traceback: {}".format(
                                                                         exc_type, 
-                                                                        exc_value.args[0],
+                                                                        exc_value.args[0] if exc_value.args else str(exc_value),
                                                                         tb.format_tb(exc_traceback)
                                                                     )
-        log.debug(debug_msg)
+        log.error(debug_msg)
         raise e
 
 def pop_result_keys(r:dict, keys_to_skip:list):
@@ -186,10 +186,11 @@ def update_inputs_in_database(inputs_to_update: dict, run_uuid: str) -> None:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         debug_msg = "exc_type: {}; exc_value: {}; exc_traceback: {}".format(
                                                                         exc_type, 
-                                                                        exc_value.args[0],
+                                                                        exc_value.args[0] if exc_value.args else str(exc_value),
                                                                         tb.format_tb(exc_traceback)
                                                                     )
-        log.debug(debug_msg)
+        log.error(debug_msg)
+        return
 
 def prune_update_fields(model_obj, dict_to_update):
     """

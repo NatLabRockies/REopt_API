@@ -45,7 +45,7 @@ pipeline {
   stages {
     stage("checkout-deploy-branch") {
       steps {
-        tadaCheckoutDeployBranch("https://github.com/NREL/REopt_API.git")
+        tadaCheckoutDeployBranch("https://github.com/NatLabRockies/REopt_API.git")
       }
     }
 

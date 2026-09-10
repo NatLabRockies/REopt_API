@@ -2,7 +2,7 @@
 lock "~> 3.12.0"
 
 set :application, "reopt_api"
-set :repo_url, "https://github.com/NREL/REopt_API.git"
+set :repo_url, "https://github.com/NatLabRockies/REopt_API.git"
 
 # Set the base deployment directory.
 set :deploy_to_base, "/srv/data/apps"

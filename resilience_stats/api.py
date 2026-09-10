@@ -1,4 +1,4 @@
-# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NREL/REopt_API/blob/master/LICENSE.
+# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NatLabRockies/REopt_API/blob/master/LICENSE.
 import json
 import sys
 import uuid
@@ -78,9 +78,9 @@ class ERPJob(ModelResource):
                 if bundle.request.META.get('HTTP_X_API_USER_ID', '') == '6f09c972-8414-469b-b3e8-a78398874103':
                     meta_dict["job_type"] = 'REopt Web Tool'
                 else:
-                    meta_dict["job_type"] = 'developer.nrel.gov'
+                    meta_dict["job_type"] = 'developer.nlr.gov'
             else:
-                meta_dict["job_type"] = 'Internal NREL'
+                meta_dict["job_type"] = 'Internal NLR'
             test_case = bundle.request.META.get('HTTP_USER_AGENT','')
             if test_case.startswith('check_http/'):
                 meta_dict["job_type"] = 'Monitoring'

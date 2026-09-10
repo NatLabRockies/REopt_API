@@ -420,7 +420,7 @@ version = "1.0.2"
 [[deps.GhpGhx]]
 git-tree-sha1 = "c2f3becdf925f287778fa088da6da01e307f6ce8"
 repo-rev = "main"
-repo-url = "https://github.com/NREL/GhpGhx.jl.git"
+repo-url = "https://github.com/NatLabRockies/GhpGhx.jl.git"
 uuid = "7ce85f02-24a8-4d69-a3f0-14b5daa7d30c"
 version = "0.1.0"
 
@@ -948,9 +948,9 @@ version = "1.11.0"
 
 [[deps.REopt]]
 deps = ["ArchGDAL", "CSV", "CoolProp", "DataFrames", "Dates", "DelimitedFiles", "HTTP", "JLD", "JSON", "JuMP", "LinDistFlow", "LinearAlgebra", "Logging", "MathOptInterface", "Requires", "Roots", "Statistics", "TestEnv"]
-git-tree-sha1 = "50654a593a8b356cdf28043c6a1d7c3ee7cd28db"
+git-tree-sha1 = "e807b62ab249fca7b59ac6ab7bb71725f504cc5f"
 uuid = "d36ad4e8-d74a-4f7a-ace1-eaea049febf6"
-version = "0.57.0"
+version = "0.59.2"
 
 [[deps.Random]]
 deps = ["SHA"]

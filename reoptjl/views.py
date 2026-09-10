@@ -1,4 +1,4 @@
-# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NREL/REopt_API/blob/master/LICENSE.
+# REopt®, Copyright (c) Alliance for Sustainable Energy, LLC. See also https://github.com/NatLabRockies/REopt_API/blob/master/LICENSE.
 from django.db import models
 from django.db.models import Q
 import uuid
@@ -441,7 +441,10 @@ def chp_defaults(request):
         "boiler_efficiency": request.GET.get("boiler_efficiency"),
         "avg_electric_load_kw": request.GET.get("avg_electric_load_kw"),
         "max_electric_load_kw": request.GET.get("max_electric_load_kw"),
-        "is_electric_only": request.GET.get("is_electric_only")
+        "is_electric_only": request.GET.get("is_electric_only"),
+        "avg_cooling_load_kw": request.GET.get("avg_cooling_load_kw"),
+        "absorption_chiller_cop": request.GET.get("absorption_chiller_cop"),
+        "include_cooling_in_chp_size": request.GET.get("include_cooling_in_chp_size")
     }
 
     if request.GET.get("size_class"):
@@ -449,6 +452,9 @@ def chp_defaults(request):
 
     if request.GET.get("thermal_efficiency"):
         inputs["thermal_efficiency"] = request.GET.get("thermal_efficiency")  # Conversion to correct type happens in http.jl
+
+    if inputs["avg_cooling_load_kw"] and inputs["include_cooling_in_chp_size"] is None:
+        inputs["include_cooling_in_chp_size"] = True
 
     try:
         julia_host = os.environ.get('JULIA_HOST', "julia")
@@ -1621,7 +1627,7 @@ def avert_emissions_profile(request):
         debug_msg = "exc_type: {}; exc_value: {}; exc_traceback: {}".format(exc_type, exc_value.args[0],
                                                                             tb.format_tb(exc_traceback))
         log.error(debug_msg)
-        return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nrel.gov if problems persist."}, status=500)
+        return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nlr.gov if problems persist."}, status=500)
 
 def cambium_profile(request):
     try:
@@ -1663,7 +1669,7 @@ def cambium_profile(request):
         debug_msg = "exc_type: {}; exc_value: {}; exc_traceback: {}".format(exc_type, exc_value.args[0],
                                                                             tb.format_tb(exc_traceback))
         log.error(debug_msg)
-        return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nrel.gov if problems persist."}, status=500)
+        return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nlr.gov if problems persist."}, status=500)
 
 def easiur_costs(request):
     try:
@@ -1698,7 +1704,7 @@ def easiur_costs(request):
         debug_msg = "exc_type: {}; exc_value: {}; exc_traceback: {}".format(exc_type, exc_value.args[0],
                                                                             tb.format_tb(exc_traceback))
         log.error(debug_msg)
-        return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nrel.gov if problems persist."}, status=500)
+        return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nlr.gov if problems persist."}, status=500)
 
 def get_load_metrics(request):
     try:
@@ -1790,7 +1796,7 @@ def sector_defaults(request):
         debug_msg = "exc_type: {}; exc_value: {}; exc_traceback: {}".format(exc_type, exc_value.args[0],
                                                                             tb.format_tb(exc_traceback))
         log.error(debug_msg)
-        return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nrel.gov if problems persist."}, status=500)
+        return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nlr.gov if problems persist."}, status=500)
 
 # def fuel_emissions_rates(request):
 #     try:
@@ -1830,7 +1836,7 @@ def sector_defaults(request):
 #         debug_msg = "exc_type: {}; exc_value: {}; exc_traceback: {}".format(exc_type, exc_value.args[0],
 #                                                                             tb.format_tb(exc_traceback))
 #         log.error(debug_msg)
-#         return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nrel.gov if problems persist."}, status=500)
+#         return JsonResponse({"Error": "Unexpected Error. Please check your input parameters and contact reopt@nlr.gov if problems persist."}, status=500)
 
 ##############################################################################################################################
 ################################################# START Results Table #########################################################
@@ -2379,7 +2385,7 @@ def generate_excel_workbook(df: pd.DataFrame, custom_table: List[Dict[str, Any]]
             # Final Note and Contact Info
             instructions_worksheet.write(row, 0, "Thank you for using the REopt Results Table Workbook!", subtitle_format)
             row += 1
-            contact_info = "For support or feedback, please contact the REopt team at reopt@nrel.gov."
+            contact_info = "For support or feedback, please contact the REopt team at reopt@nlr.gov."
             instructions_worksheet.write(row, 0, contact_info, subtitle_format)
             # Freeze panes to keep the title visible
             instructions_worksheet.freeze_panes(1, 0)
