@@ -1,0 +1,16 @@
+<%= ERB.new(File.read(Rails.root.join("db/grants.sql.erb"))).result %>
+<%= ERB.new(File.read(Rails.root.join("db/setup.sql.erb"))).result %>
+<%= ERB.new(File.read(Rails.root.join("db/task_functions.sql.erb"))).result %>
+
+DO $$
+  BEGIN
+    PERFORM pg_temp.setup_concurrency_lock();
+    PERFORM pg_temp.perform_setup();
+
+    -- Ensure grants are always performed inside the same transaction as setup,
+    -- in case setup dropped/recreated any resources (like foreign data tables)
+    -- so that grants don't go missing (since setup is often run before
+    -- migrations and grants aren't run until after migrations).
+    PERFORM pg_temp.perform_grants();
+  END;
+$$;

@@ -1,0 +1,38 @@
+<%
+if Rails.env.local?
+  db_passwords = {
+    :reopt_api => "dev_password",
+    :reopt_api_app_user => "dev_password",
+  }
+end
+%>
+
+CREATE OR REPLACE FUNCTION pg_temp.perform_setup()
+RETURNS void
+PARALLEL UNSAFE
+LANGUAGE plpgsql
+AS $$
+  BEGIN
+    <% if Rails.env.local? %>
+      -- Create schema-owning user.
+      PERFORM pg_temp.upsert_role('reopt_api', 'NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT LOGIN NOREPLICATION NOBYPASSRLS', '<%= PG::Connection.escape(db_passwords.fetch(:reopt_api)) %>');
+
+      -- Create application user.
+      PERFORM pg_temp.upsert_role('reopt_api_app_user', 'NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT LOGIN NOREPLICATION NOBYPASSRLS', '<%= PG::Connection.escape(db_passwords.fetch(:reopt_api_app_user)) %>');
+
+      -- Create application group
+      PERFORM pg_temp.upsert_role('reopt_api_app_group', 'NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT NOLOGIN NOREPLICATION NOBYPASSRLS');
+    <% end %>
+
+    -- Grant schema-owner privileges to DBA accounts.
+    PERFORM pg_temp.tuple_concurrency_retry('GRANT reopt_api TO postgres');
+
+    -- Grant the app group to the users.
+    PERFORM pg_temp.tuple_concurrency_retry('GRANT reopt_api_app_group TO reopt_api');
+    PERFORM pg_temp.tuple_concurrency_retry('GRANT reopt_api_app_group TO reopt_api_app_user');
+
+    -- Create schemas.
+    CREATE SCHEMA IF NOT EXISTS reopt_api;
+    ALTER SCHEMA reopt_api OWNER TO reopt_api;
+  END;
+$$;

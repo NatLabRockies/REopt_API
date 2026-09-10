@@ -3677,6 +3677,15 @@ class ElectricStorageInputs(BaseModel, models.Model):
         blank=True,
         help_text="ElectricStorage size class. Must be an integer value between 1 and 3. Default is calculated per ratio of annual peak and average load of given load profile."
     )
+    ELECTRICSTORAGE_DISPATCH_STRATEGY = models.TextChoices('ELECTRICSTORAGE_DISPATCH_STRATEGY', (
+        "optimized",
+        "peak_shaving_look_ahead",
+        "peak_shaving_look_behind",
+        "self_consumption",
+        "backup",
+        "custom_soc",
+        "daily_foresight_optimized"
+    ))
 
     min_kw = models.FloatField(
         default=0,
@@ -3741,8 +3750,14 @@ class ElectricStorageInputs(BaseModel, models.Model):
         blank=True,
         help_text="Battery rectifier efficiency"
     )
+    dispatch_strategy = models.TextField(
+        default=ELECTRICSTORAGE_DISPATCH_STRATEGY.optimized,
+        choices=ELECTRICSTORAGE_DISPATCH_STRATEGY.choices,
+        null=True,
+        blank=True,
+        help_text="Electric storage dispatch strategy can be one of: optimized, peak_shaving_look_ahead, peak_shaving_look_behind, self_consumption, backup, custom_soc, daily_foresight_optimized"
+    )
     soc_min_fraction = models.FloatField(
-        default=0.2,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0)
@@ -3786,6 +3801,24 @@ class ElectricStorageInputs(BaseModel, models.Model):
     can_grid_charge = models.BooleanField(
         blank=True,
         help_text="Flag to set whether the battery can be charged from the grid, or just onsite generation."
+    )
+    can_net_meter = models.BooleanField(
+        default=False,
+        blank=True,
+        help_text=("True/False for if technology has option to participate in net metering agreement with utility. "
+                   "Note that a technology can only participate in either net metering or wholesale rates (not both).")
+    )
+    can_wholesale = models.BooleanField(
+        default=False,
+        blank=True,
+        help_text=("True/False for if technology has option to export energy that is compensated at the wholesale_rate. "
+                   "Note that a technology can only participate in either net metering or wholesale rates (not both).")
+    )
+    can_export_beyond_nem_limit = models.BooleanField(
+        default=False,
+        blank=True,
+        help_text=("True/False for if technology can export energy beyond the annual site load (and be compensated for "
+                   "that energy at the export_rate_beyond_net_metering_limit).")
     )
     installed_cost_per_kw = models.FloatField(
         validators=[
@@ -3969,6 +4002,10 @@ class ElectricStorageOutputs(BaseModel, models.Model):
         blank=True, default=list
     )
     storage_to_load_series_kw = ArrayField(
+        models.FloatField(null=True, blank=True),
+        blank=True, default=list
+    )
+    storage_to_grid_series_kw = ArrayField(
         models.FloatField(null=True, blank=True),
         blank=True, default=list
     )
@@ -4391,11 +4428,16 @@ class GeneratorOutputs(BaseModel, models.Model):
 
 class CHPInputs(BaseModel, models.Model):
     key = "CHP"
-    meta = models.OneToOneField(
+    meta = models.ForeignKey(
         to=APIMeta,
         on_delete=models.CASCADE,
         related_name="CHPInputs",
-        unique=True
+        unique=False
+    )
+    name = models.TextField(
+        blank=True,
+        default="CHP",
+        help_text="CHP description for distinguishing between multiple CHP models"
     )
 
     # Prime mover
@@ -4521,7 +4563,7 @@ class CHPInputs(BaseModel, models.Model):
         ],
         null=True, 
         blank=True,
-        help_text="Maximum CHP size (in kWe) constraint for optimization. Set to zero to disable CHP"
+        help_text="Maximum new CHP size (in kWe) constraint for optimization (upper bound on additional capacity beyond existing_kw). Set to zero to disable CHP"
     )
     cooling_thermal_factor = models.FloatField(
         validators=[
@@ -4556,6 +4598,15 @@ class CHPInputs(BaseModel, models.Model):
         blank=True,
         help_text="CHP size class. Must be an integer value between 0 and 7"
     )
+    existing_kw = models.FloatField(
+        default=0,
+        validators=[
+            MinValueValidator(0),
+            MaxValueValidator(1.0e5)
+        ],
+        blank=True,
+        help_text="Existing CHP electric capacity (based on rated electric power)"
+    )
     min_kw = models.FloatField(
         default=0,
         validators=[
@@ -4563,7 +4614,7 @@ class CHPInputs(BaseModel, models.Model):
             MaxValueValidator(1.0e9)
         ],
         blank=True,
-        help_text="Minimum CHP size constraint for optimization"
+        help_text="Minimum new CHP size constraint for optimization (lower bound on additional capacity beyond existing_kw)."
     )
     fuel_type = models.TextField(
         null=False,
@@ -4590,6 +4641,15 @@ class CHPInputs(BaseModel, models.Model):
         ],
         blank=True,
         help_text="CHP system per-operating-hour (variable) operations and maintenance costs in $/hr-kW"
+    )
+    ramp_rate_fraction_per_hour = models.FloatField(
+        default=1.0,
+        validators=[
+            MinValueValidator(0.0),
+            MaxValueValidator(1.0e3)
+        ],
+        blank=True,
+        help_text="Maximum rate of change in electric production per hour as a fraction of size_kw [kW/size_kw/hour]."
     )
     supplementary_firing_capital_cost_per_kw = models.FloatField(
         default=150,
@@ -4675,6 +4735,12 @@ class CHPInputs(BaseModel, models.Model):
         blank=True,
         help_text="Boolean indicator if CHP follows the electrical load by running at capacity or meeting the load only"   
     )
+    follow_heating_load = models.BooleanField(
+        default=False,
+        null=True, 
+        blank=True,
+        help_text="Boolean indicator if CHP follows the heating load by running at capacity or meeting the load only"
+    )
     can_serve_dhw = models.BooleanField(
         default=True,
         null=True, 
@@ -4692,6 +4758,26 @@ class CHPInputs(BaseModel, models.Model):
         null=True, 
         blank=True,
         help_text="Boolean indicator if CHP can serve process heat load"   
+    )
+    operating_reserve_required_fraction = models.FloatField(
+        validators=[
+            MinValueValidator(0.0),
+            MaxValueValidator(1.0)
+        ],
+        blank=True,
+        null=True,
+        help_text=("Only applicable when off_grid_flag=True. Required operating reserves applied to each timestep "
+                   "as a fraction of CHP generation serving load in that timestep.")
+    )
+    production_factor_series = ArrayField(
+        models.FloatField(
+            blank=True
+        ),
+        default=list,
+        blank=True,
+        help_text=("Optional user-defined production factors. Must be normalized to units of kW-AC/kW-AC nameplate, "
+                   "representing the AC power (kW) output per 1 kW-AC of CHP capacity in each time step. "
+                   "The series must be one year (January through December) of hourly, 30-minute, or 15-minute data.")
     )
 
 
@@ -4914,6 +5000,15 @@ class CHPInputs(BaseModel, models.Model):
         null=True,
         help_text="Pounds of CO2 emitted per MMBTU of CHP fuel burned."
     )
+    fuel_cost_escalation_rate_fraction = models.FloatField(
+        validators=[
+            MinValueValidator(-1.0),
+            MaxValueValidator(1.0)
+        ],
+        null=True,
+        blank=True,
+        help_text="Annual nominal chp fuel cost escalation rate, as a decimal."
+    )
     
     def clean(self):
         error_messages = {}
@@ -4943,16 +5038,25 @@ class CHPInputs(BaseModel, models.Model):
 
 class CHPOutputs(BaseModel, models.Model):
     key = "CHPOutputs"
-    meta = models.OneToOneField(
+    meta = models.ForeignKey(
         to=APIMeta,
         on_delete=models.CASCADE,
         related_name="CHPOutputs",
-        unique=True
+        unique=False
+    )
+    name = models.TextField(
+        blank=True,
+        default="CHP",
+        help_text="CHP description for distinguishing between multiple CHP models"
     )
     
     size_kw = models.FloatField(
         null=True, blank=True,
         help_text="Power capacity size of the CHP system [kW]"
+    )
+    size_kw_bau = models.FloatField(
+        null=True, blank=True,
+        help_text="Power capacity size of the existing CHP system in BAU [kW]"
     )
     size_supplemental_firing_kw = models.FloatField(
         null=True, blank=True,
@@ -4962,13 +5066,33 @@ class CHPOutputs(BaseModel, models.Model):
         null=True, blank=True,
         help_text="Fuel consumed in a year [MMBtu]"
     )
+    annual_fuel_consumption_mmbtu_bau = models.FloatField(
+        null=True, blank=True,
+        help_text="Fuel consumed in a year by the existing CHP system in BAU [MMBtu]"
+    )
     annual_electric_production_kwh = models.FloatField(
         null=True, blank=True,
         help_text="Electric energy produced in a year [kWh]"
     )
+    annual_electric_production_kwh_bau = models.FloatField(
+        null=True, blank=True,
+        help_text="Electric energy produced in a year by the existing CHP system in BAU [kWh]"
+    )
     annual_thermal_production_mmbtu = models.FloatField(
         null=True, blank=True,
         help_text="Thermal energy produced in a year [MMBtu]"
+    )
+    annual_thermal_production_mmbtu_bau = models.FloatField(
+        null=True, blank=True,
+        help_text="Thermal energy produced in a year by the existing CHP system in BAU [MMBtu]"
+    )
+    annual_thermal_curtailed_mmbtu = models.FloatField(
+        null=True, blank=True,
+        help_text="Thermal energy wasted/unused/vented in a year [MMBtu]"
+    )
+    annual_thermal_curtailed_mmbtu_bau = models.FloatField(
+        null=True, blank=True,
+        help_text="Thermal energy wasted/unused/vented in a year by the existing CHP system in BAU [MMBtu]"
     )
     electric_production_series_kw = ArrayField(
         models.FloatField(
@@ -4997,6 +5121,13 @@ class CHPOutputs(BaseModel, models.Model):
         ),
         default=list, blank=True,
         help_text="Electric power serving the electric load time-series array [kW]"
+    )
+    electric_curtailed_series_kw = ArrayField(
+        models.FloatField(
+            null=True, blank=True
+        ),
+        default=list, blank=True,
+        help_text="Electric power curtailed time-series array [kW]"
     )
     thermal_to_storage_series_mmbtu_per_hour = ArrayField(
         models.FloatField(
@@ -5037,25 +5168,49 @@ class CHPOutputs(BaseModel, models.Model):
         null=True, blank=True,
         help_text="Cost of fuel consumed by the CHP system in year one [$]"
     )
+    year_one_fuel_cost_before_tax_bau = models.FloatField(
+        null=True, blank=True,
+        help_text="Cost of fuel consumed by the existing CHP system in year one in BAU [$]"
+    )
     year_one_fuel_cost_after_tax = models.FloatField(
         null=True, blank=True,
         help_text="Cost of fuel consumed by the CHP system in year one, after tax [$]"
-    )    
+    )
+    year_one_fuel_cost_after_tax_bau = models.FloatField(
+        null=True, blank=True,
+        help_text="Cost of fuel consumed by the existing CHP system in year one in BAU, after tax [$]"
+    )
     lifecycle_fuel_cost_after_tax = models.FloatField(
         null=True, blank=True,
         help_text="Present value of cost of fuel consumed by the CHP system, after tax [$]"
+    )
+    lifecycle_fuel_cost_after_tax_bau = models.FloatField(
+        null=True, blank=True,
+        help_text="Present value of cost of fuel consumed by the existing CHP system in BAU, after tax [$]"
     )
     year_one_standby_cost_before_tax = models.FloatField(
         null=True, blank=True,
         help_text="CHP standby charges in year one [$]"
     )
+    year_one_standby_cost_before_tax_bau = models.FloatField(
+        null=True, blank=True,
+        help_text="CHP standby charges in year one for the existing CHP system in BAU [$]"
+    )
     year_one_standby_cost_after_tax = models.FloatField(
         null=True, blank=True,
         help_text="CHP standby charges in year one, after tax [$]"
-    )    
+    )
+    year_one_standby_cost_after_tax_bau = models.FloatField(
+        null=True, blank=True,
+        help_text="CHP standby charges in year one for the existing CHP system in BAU, after tax [$]"
+    )
     lifecycle_standby_cost_after_tax = models.FloatField(
         null=True, blank=True,
         help_text="Present value of all CHP standby charges, after tax."
+    )
+    lifecycle_standby_cost_after_tax_bau = models.FloatField(
+        null=True, blank=True,
+        help_text="Present value of all CHP standby charges for the existing CHP system in BAU, after tax."
     )
     thermal_production_series_mmbtu_per_hour = ArrayField(
         models.FloatField(null=True, blank=True),
@@ -9452,8 +9607,16 @@ def get_input_dict_from_run_uuid(run_uuid:str):
     try: d["ColdThermalStorage"] = filter_none_and_empty_array(meta.ColdThermalStorageInputs.dict)
     except: pass
     
-    try: d["CHP"] = filter_none_and_empty_array(meta.CHPInputs.dict)
-    except: pass
+    try:
+        chps = meta.CHPInputs.all()
+        if len(chps) == 1:
+            d["CHP"] = filter_none_and_empty_array(chps[0].dict)
+        elif len(chps) > 1:
+            d["CHP"] = []
+            for chp in chps:
+                d["CHP"].append(filter_none_and_empty_array(chp.dict))
+    except:
+        pass
 
     try: d["SteamTurbine"] = filter_none_and_empty_array(meta.SteamTurbineInputs.dict)
     except: pass

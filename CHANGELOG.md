@@ -26,12 +26,42 @@ Classify the change according to the following categories:
     ##### Removed
     ### Patches
 
-## fixed-soc
-### Minor udpates
-#### Added
-- Add **ElectricStorage** inputs field **fixed_soc_series_fraction** and  **fixed_soc_series_fraction_tolerance** to allow users to fix the SOC timeseries within a chosen absolute tolerance
-### Changed
-- **ElectricStorage** result key **state_of_health** to **state_of_health_series_fraction**
+## v3.23.0
+### Minor Updates
+##### Changed
+- Upgrades Julia environment dependencies
+- Notably updates the solver stack dependencies for which the HiGHS update may affect the optimization algorithm and therefore results
+- Updates internally-used developer key environment variables to NLR from NREL for Julia environment
+
+## v3.22.1
+### Patches
+- Update REopt.jl with fix for custom generation profile with production_factor and load-following inputs
+
+## v3.22.0
+### Minor Updates
+##### Added
+- Expanded **CHP** modeling to support multiple independently-configured CHPs, existing capacity (i.e. in BAU scenario), off-grid operation including the option for CHP to either require or supply operating reserves, user-defined production factors, ramp-rate limits, and heating load following thermal dispatch.
+- Added **CHP** inputs **name** (to label the type of system you are modeling), **existing_kw**, **ramp_rate_fraction_per_hour**, **operating_reserve_required_fraction**, **production_factor_series**, **fuel_cost_escalation_rate_fraction**, and **follow_heating_load**. When **follow_heating_load** is `true`, each CHP independently follows its eligible heating load at unfired thermal capacity; **ExistingBoiler** is restricted when CHP capacity exceeds that load, while other onsite heating resources can contribute and supplementary firing remains available only as incremental heat.
+- Added **CHP** outputs **name**, **electric_curtailed_series_kw**, and **annual_thermal_curtailed_mmbtu**. Multiple CHP systems are returned as a list of per-unit results under **CHP**, identified by **name**.
+- Added **CHP** BAU outputs **size_kw_bau**, **annual_fuel_consumption_mmbtu_bau**, **annual_electric_production_kwh_bau**, **annual_thermal_production_mmbtu_bau**, **annual_thermal_curtailed_mmbtu_bau**, **year_one_fuel_cost_before_tax_bau**, **year_one_fuel_cost_after_tax_bau**, **lifecycle_fuel_cost_after_tax_bau**, **year_one_standby_cost_before_tax_bau**, **year_one_standby_cost_after_tax_bau**, and **lifecycle_standby_cost_after_tax_bau**.
+
+## v3.21.0
+### Minor Updates
+##### Added
+- Added **ElectricStorage** input **dispatch_strategy** to select battery dispatch behavior. Supported values are **optimized** (default), **peak_shaving_look_ahead**, **peak_shaving_look_behind**, **self_consumption**, **backup**, **custom_soc**, and **daily_foresight_optimized**.
+- Added **ElectricStorage** inputs **fixed_soc_series_fraction** and **fixed_soc_series_fraction_tolerance** to constrain the battery state-of-charge time series to user-provided values within an absolute tolerance.
+- Added **ElectricStorage** inputs **can_net_meter**, **can_wholesale**, and **can_export_beyond_nem_limit** to control whether battery exports can receive the corresponding electric tariff compensation. These inputs default to **false**.
+- Added **ElectricStorage** output **storage_to_grid_series_kw** for the battery power exported to the grid in each time step. Annual battery exports are also included in custom results tables as "Battery Exported to Grid (kWh/yr)."
+##### Changed
+- Renamed the **ElectricStorage** output **state_of_health** to **state_of_health_series_fraction**.
+- The default **ElectricStorage** input **soc_min_fraction** is now 0.8 when **dispatch_strategy** is **backup** and remains 0.2 for all other dispatch strategies.
+
+## v3.20.0
+### Minor Updates
+##### Changed
+- New deployment process to NLR servers, for production API
+- Update PostgreSQL to v18
+- keys.py setup changed to .env for specifying user's NLR_API_KEY
 
 ## v3.19.1
 ### Patches
@@ -39,7 +69,7 @@ Classify the change according to the following categories:
 
 ## v3.19.0
 ### Minor updates
-#### Added 
+##### Added 
 - New `CHP` fields **serve_absorption_chiller_only**, **months_serving_absorption_chiller_only**, **follow_electrical_load**, and **include_cooling_in_chp_size**
 - New output `thermal_to_absorption_chiller_series_mmbtu_per_hour` added to heating technologies `CHPOutputs`, `ElectricHeaterOutputs`, `CSTOutputs`, `BoilerOutputs`, `SteamTurbineOutputs`, and `ExistingBoilerOutputs`, and new output `storage_to_absorption_chiller_series_mmbtu_per_hour` for `HotThermalStorageOutputs` and `HighTempThermalStorageOutputs`.  
 ##### Changed
