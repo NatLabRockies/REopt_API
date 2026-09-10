@@ -278,7 +278,7 @@ function reopt(req::HTTP.Request)
             end     
             if haskey(d, "ElectricStorage")
                 inputs_with_defaults_from_julia_electric_storage = [
-                    :macrs_option_years, :macrs_bonus_fraction, :total_itc_fraction, :internal_efficiency_fraction
+                    :macrs_option_years, :macrs_bonus_fraction, :total_itc_fraction, :internal_efficiency_fraction, :size_class
                 ]
                 electric_storage_dict = Dict(key=>getfield(model_inputs.s.storage.attr["ElectricStorage"], key) for key in inputs_with_defaults_from_julia_electric_storage)
             else
