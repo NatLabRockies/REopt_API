@@ -200,8 +200,8 @@ resources: Listing<K8sResource> = new {
     tadaContainerImage = containerImage
     tadaImagePullSecretName = ecrLoginRenewConfigMapResource.imagePullSecretName
 
-    tadaResourceLimitCpu = "1000m"
-    tadaResourceRequestCpu = "100m"
+    tadaResourceLimitCpu = "1200m"
+    tadaResourceRequestCpu = "500m"
     tadaResourceLimitMemory = 1600.mib
     tadaResourceRequestMemory = 1600.mib
 
@@ -261,17 +261,17 @@ resources: Listing<K8sResource> = new {
               resources {
                 requests {
                   when (deployMetadata.`deploy-env` == "production") {
-                    ["memory"] = 12000.mib
+                    ["memory"] = 20000.mib
                   } else {
-                    ["memory"] = 6000.mib
+                    ["memory"] = 12000.mib
                   }
                 }
 
                 limits {
                   when (deployMetadata.`deploy-env` == "production") {
-                    ["memory"] = 12000.mib
+                    ["memory"] = 20000.mib
                   } else {
-                    ["memory"] = 6000.mib
+                    ["memory"] = 12000.mib
                   }
                 }
               }
