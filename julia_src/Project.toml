@@ -20,5 +20,7 @@ GhpGhx = {rev = "main", url = "https://github.com/NatLabRockies/GhpGhx.jl.git"}
 REopt = {rev = "julia-113", url = "https://github.com/NatLabRockies/REopt.jl.git"}
 
 [compat]
-PROJ_jll = "900.0.0"
-SQLite_jll = "~3.48"
+# PROJ_jll 900.x required pinning SQLite_jll to ~3.48 (SONAME libsqlite3.so.0)
+# and broke on Julia 1.13 (libproj.so needs CURL_4, absent from the bundled
+# libcurl.so.4). PROJ_jll 902.x links both correctly, so neither pin is needed.
+PROJ_jll = "902"
