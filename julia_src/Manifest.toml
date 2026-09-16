@@ -1162,7 +1162,7 @@ version = "1.11.0"
 
 [[deps.REopt]]
 deps = ["ArchGDAL", "CSV", "CoolProp", "DataFrames", "Dates", "DelimitedFiles", "HTTP", "JLD", "JSON", "JuMP", "LinDistFlow", "LinearAlgebra", "Logging", "MathOptInterface", "Requires", "Roots", "Statistics", "TestEnv"]
-git-tree-sha1 = "83fe56ee7480ce9f1549713be2efd34e9a8b6cea"
+git-tree-sha1 = "36ff6f22759034e7b9fa7b24454074f2ad412b2a"
 repo-rev = "julia-113"
 repo-url = "https://github.com/NatLabRockies/REopt.jl.git"
 uuid = "d36ad4e8-d74a-4f7a-ace1-eaea049febf6"
