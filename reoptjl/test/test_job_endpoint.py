@@ -421,3 +421,45 @@ class TestJobEndpoint(ResourceTestCaseMixin, TransactionTestCase):
         
         self.assertEqual(r["inputs"]["PV"]["size_class"], 2)
         self.assertAlmostEqual(r["inputs"]["PV"]["installed_cost_per_kw"], 2914.6, delta=0.05 * 2914.6)
+
+    def test_electric_storage_cost_defaults_update_from_julia(self):
+
+        input_data = dict()
+
+        input_data["Financial"] = dict()
+        input_data["Financial"]["analysis_years"] = 20
+        input_data["Financial"]["offtaker_discount_rate_fraction"] = 0.06
+        input_data["Financial"]["offtaker_tax_rate_fraction"] = 0.26
+        input_data["Financial"]["elec_cost_escalation_rate_fraction"] = 0.03
+        input_data["Financial"]["om_cost_escalation_rate_fraction"] = 0.02
+
+        input_data["ElectricStorage"] = dict()
+        input_data["ElectricStorage"]["total_itc_fraction"] = 0.0
+        input_data["ElectricStorage"]["macrs_option_years"] = 0
+        input_data["ElectricStorage"]["macrs_bonus_fraction"] = 0.0
+
+        input_data["ElectricLoad"] = dict()
+        # Average load is 250 kw
+        input_data["ElectricLoad"]["loads_kw"] = [250.0] * 8760
+        # Peak load determines size class. We use size class bounds to vary size class.
+        input_data["ElectricLoad"]["loads_kw"][6000] = 250.0 + 39
+        input_data["ElectricLoad"]["year"] = 2025
+
+        input_data["Site"] = dict()
+        input_data["Site"]["longitude"] = -118.1164613
+        input_data["Site"]["latitude"] = 34.5794343
+
+        input_data["ElectricTariff"] = dict()
+        input_data["ElectricTariff"]["blended_annual_energy_rate"] = 0.12
+        input_data["ElectricTariff"]["blended_annual_demand_rate"] = 12.0
+        
+        resp = self.api_client.post('/stable/job/', format='json', data=input_data)
+        self.assertHttpCreated(resp)
+        r = json.loads(resp.content)
+        run_uuid = r.get('run_uuid')
+
+        resp = self.api_client.get(f'/stable/job/{run_uuid}/results')
+        r = json.loads(resp.content)
+        
+        self.assertEqual(r["inputs"]["ElectricStorage"]["size_class"], 1)
+        self.assertAlmostEqual(r["inputs"]["PV"]["installed_cost_per_kw"], 705)
