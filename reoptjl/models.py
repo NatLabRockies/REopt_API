@@ -3902,7 +3902,7 @@ class ElectricStorageInputs(BaseModel, models.Model):
         help_text="Number of years from start of analysis period to apply replace_cost_constant."
     )
     om_cost_fraction_of_installed_cost = models.FloatField(
-        default=0.025,
+        default=0.04,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0)
