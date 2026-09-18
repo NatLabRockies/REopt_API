@@ -27,7 +27,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='chpinputs',
             name='supplementary_firing_installed_cost_per_mmbtu_per_hour',
-            field=models.FloatField(blank=True, default=10000.0, help_text='Installed CHP supplementary firing system cost in $/MMBtu/hr of incremental thermal capacity', null=True, validators=[django.core.validators.MinValueValidator(0.0), django.core.validators.MaxValueValidator(10000000.0)]),
+            field=models.FloatField(blank=True, default=20000.0, help_text='Installed CHP supplementary firing system cost in $/MMBtu/hr of incremental thermal capacity', null=True, validators=[django.core.validators.MinValueValidator(0.0), django.core.validators.MaxValueValidator(10000000.0)]),
         ),
         migrations.AlterField(
             model_name='chpinputs',

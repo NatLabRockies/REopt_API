@@ -4643,7 +4643,7 @@ class CHPInputs(BaseModel, models.Model):
         help_text="Maximum rate of change in electric production per hour as a fraction of size_kw [kW/size_kw/hour]."
     )
     supplementary_firing_installed_cost_per_mmbtu_per_hour = models.FloatField(
-        default=10000.0,
+        default=20000.0,
         validators=[
             MinValueValidator(0.0),
             MaxValueValidator(1.0e7)
