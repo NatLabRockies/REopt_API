@@ -462,4 +462,4 @@ class TestJobEndpoint(ResourceTestCaseMixin, TransactionTestCase):
         r = json.loads(resp.content)
         
         self.assertEqual(r["inputs"]["ElectricStorage"]["size_class"], 1)
-        self.assertAlmostEqual(r["inputs"]["PV"]["installed_cost_per_kw"], 705)
+        self.assertAlmostEqual(r["inputs"]["ElectricStorage"]["installed_cost_per_kw"], 705)
