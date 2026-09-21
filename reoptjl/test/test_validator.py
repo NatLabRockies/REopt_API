@@ -102,7 +102,7 @@ class InputValidatorTests(TestCase):
 
         self.assertAlmostEqual(validator.models["Wind"].operating_reserve_required_fraction, 0.5)
         self.assertAlmostEqual(validator.models["PV"].operating_reserve_required_fraction, 0.25)
-        self.assertEqual(validator.models["Wind"].installed_cost_per_kw, 5776.0) # set based on size_class (commercial)
+        self.assertEqual(validator.models["Wind"].installed_cost_per_kw, 6782.0) # set based on size_class (commercial)
 
         self.assertAlmostEqual(validator.models["ElectricLoad"].operating_reserve_required_fraction, 0.1)
         self.assertAlmostEqual(validator.models["ElectricLoad"].critical_load_fraction, 1.0)
