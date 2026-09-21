@@ -76,10 +76,10 @@ EMISSIONS_DECREASE_DEFAULTS = { # year over year decrease in grid emissions rate
 }
 
 WIND_COST_DEFAULTS = { # size_class_to_installed_cost 
-    "residential" : 7692.0,
-    "commercial" : 5776.0,
-    "medium" : 3807.0,
-    "large" : 2896.0
+    "residential" : 8960.0,
+    "commercial" : 6782.0,
+    "medium" : 4368.0,
+    "large" : 3477.0
 }
 
 def at_least_one_set(model, possible_sets):
@@ -3411,7 +3411,7 @@ class WindInputs(BaseModel, models.Model):
         help_text="Installed cost in $/kW. Default cost is determined based on size_class."
     )
     om_cost_per_kw = models.FloatField(
-        default=42,
+        default=43,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0e3)
