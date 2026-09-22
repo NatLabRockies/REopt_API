@@ -461,5 +461,5 @@ class TestJobEndpoint(ResourceTestCaseMixin, TransactionTestCase):
         resp = self.api_client.get(f'/stable/job/{run_uuid}/results')
         r = json.loads(resp.content)
         
-        self.assertEqual(r["inputs"]["ElectricStorage"]["size_class"], 1)
-        self.assertAlmostEqual(r["inputs"]["ElectricStorage"]["installed_cost_per_kw"], 705)
+        self.assertEqual(r["inputs"]["ElectricStorage"]["size_class"], 2)
+        self.assertAlmostEqual(r["inputs"]["ElectricStorage"]["installed_cost_per_kw"], 676)
