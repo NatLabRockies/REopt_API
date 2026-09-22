@@ -76,10 +76,10 @@ EMISSIONS_DECREASE_DEFAULTS = { # year over year decrease in grid emissions rate
 }
 
 WIND_COST_DEFAULTS = { # size_class_to_installed_cost 
-    "residential" : 7692.0,
-    "commercial" : 5776.0,
-    "medium" : 3807.0,
-    "large" : 2896.0
+    "residential" : 8960.0,
+    "commercial" : 6782.0,
+    "medium" : 4368.0,
+    "large" : 3477.0
 }
 
 def at_least_one_set(model, possible_sets):
@@ -3411,7 +3411,7 @@ class WindInputs(BaseModel, models.Model):
         help_text="Installed cost in $/kW. Default cost is determined based on size_class."
     )
     om_cost_per_kw = models.FloatField(
-        default=42,
+        default=43,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0e3)
@@ -3668,6 +3668,15 @@ class ElectricStorageInputs(BaseModel, models.Model):
         primary_key=True
     )
 
+    size_class = models.IntegerField(
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(4)
+        ],
+        null=True,
+        blank=True,
+        help_text="ElectricStorage size class. Must be an integer value between 1 and 4. Default is calculated per ratio of annual peak and average load of given load profile."
+    )
     ELECTRICSTORAGE_DISPATCH_STRATEGY = models.TextChoices('ELECTRICSTORAGE_DISPATCH_STRATEGY', (
         "optimized",
         "peak_shaving_look_ahead",
@@ -3812,29 +3821,29 @@ class ElectricStorageInputs(BaseModel, models.Model):
                    "that energy at the export_rate_beyond_net_metering_limit).")
     )
     installed_cost_per_kw = models.FloatField(
-        default=968.0,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0e4)
         ],
+        null=True,
         blank=True,
         help_text="Total upfront battery power capacity costs (e.g. inverter and balance of power systems)"
     )
     installed_cost_per_kwh = models.FloatField(
-        default=253.0,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0e4)
         ],
+        null=True,
         blank=True,
         help_text="Total upfront battery costs"
     )
     installed_cost_constant = models.FloatField(
-        default=222115.0,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0e9)
         ],
+        null=True,
         blank=True,
         help_text="Fixed upfront cost for battery installation, independent of size."
     )
@@ -3893,7 +3902,7 @@ class ElectricStorageInputs(BaseModel, models.Model):
         help_text="Number of years from start of analysis period to apply replace_cost_constant."
     )
     om_cost_fraction_of_installed_cost = models.FloatField(
-        default=0.025,
+        default=0.04,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0)

@@ -539,6 +539,18 @@ class TestHTTPEndpoints(ResourceTestCaseMixin, TestCase):
         resp = self.api_client.get(f'/v3/pv_cost_defaults', data=inputs_dict)
         view_response = json.loads(resp.content)
 
-        self.assertEqual(view_response["size_class"], 3)   
+        self.assertEqual(view_response["size_class"], 3)
+
+    def test_electric_storage_cost_defaults(self):
+            inputs_dict = {
+                "electric_load_annual_peak": 8760000.0,
+                "electric_load_average": 8760
+            }
+    
+            # Call to the django view endpoint /get_electric_storage_defaults which calls the http.jl endpoint
+            resp = self.api_client.get(f'/v3/electric_storage_cost_defaults', data=inputs_dict)
+            view_response = json.loads(resp.content)
+    
+            self.assertEqual(view_response["size_class"], 4)  
 
 
