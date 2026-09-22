@@ -902,7 +902,7 @@ function electric_storage_cost_defaults(req::HTTP.Request)
     data = Dict()
     error_response = Dict()
     try
-        data["installed_cost_per_kw"], data["installed_cost_per_kwh"], data["installed_cost_constant"], data["size_class"], data["size_kw_for_size_class"] = reoptjl.get_electric_storage_cost_params(;
+        data["installed_cost_per_kw"], data["installed_cost_per_kwh"], data["installed_cost_constant"], data["size_class"], data["size_kw_for_size_class"], data["electric_load_based_sizing_kw"], data["size_class_bounds_kw"] = reoptjl.get_electric_storage_cost_params(;
              (Symbol(k) => v for (k, v) in pairs(d))...
         )
     catch e
