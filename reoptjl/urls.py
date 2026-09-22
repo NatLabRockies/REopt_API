@@ -27,6 +27,7 @@ urlpatterns = [
     re_path(r'^job/generate_results_table/?$', views.generate_results_table),
     re_path(r'^get_ashp_defaults/?$', views.get_ashp_defaults),
     re_path(r'^pv_cost_defaults/?$', views.pv_cost_defaults),
+    re_path(r'^electric_storage_cost_defaults/?$', views.electric_storage_cost_defaults),
     re_path(r'^summary_by_runuuids/?$', views.summary_by_runuuids),
     re_path(r'^link_run_to_portfolios/?$', views.link_run_uuids_to_portfolio_uuid),
     re_path(r'^get_load_metrics/?$', views.get_load_metrics),
