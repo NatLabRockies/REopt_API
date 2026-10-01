@@ -26,6 +26,11 @@ Classify the change according to the following categories:
     ##### Removed
     ### Patches
 
+## add-outage-prod-option
+### Minor Updates
+#### Added
+- Inputs **PV.outage_production_fraction** and **Wind.outage_production_fraction** to optionally reduce production during modeled outages. Only applies with multiple outage modeling using inputs outage_start_time_steps and outage_durations.
+
 ## v3.23.0
 ### Minor Updates
 ##### Changed

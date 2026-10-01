@@ -3284,6 +3284,16 @@ class PVInputs(BaseModel, models.Model):
                 "Required operating reserves applied to each timestep as a fraction of PV generation serving load in that timestep.")
     )
 
+    outage_production_fraction = models.FloatField(
+        validators=[
+            MinValueValidator(0),
+            MaxValueValidator(1.0)
+        ],
+        blank=True,
+        default=1.0,
+        help_text=("Fraction of production available during outages. Only applies with multiple outage modeling using inputs outage_start_time_steps and outage_durations.")
+    )
+
 
 class PVOutputs(BaseModel, models.Model):
     key = "PVOutputs"
@@ -3623,6 +3633,15 @@ class WindInputs(BaseModel, models.Model):
         ],
         blank=True,
         help_text="Land area required per kW of wind capacity in acres/kW; only constrained by this for systems greater than 1500 kW"
+    )
+    outage_production_fraction = models.FloatField(
+        validators=[
+            MinValueValidator(0),
+            MaxValueValidator(1.0)
+        ],
+        blank=True,
+        default=1.0,
+        help_text=("Fraction of production available during outages. Only applies with multiple outage modeling using inputs outage_start_time_steps and outage_durations.")
     )
 
     def clean(self):
