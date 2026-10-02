@@ -82,7 +82,7 @@ msrest==0.7.1
 msrestazure==0.6.4.post1
 munch==4.0.0
 nbclient==0.10.2
-nbconvert==7.16.6
+nbconvert==7.17.0
 nbformat==5.10.4
 ndindex==1.10.0
 numexpr==2.11.0
