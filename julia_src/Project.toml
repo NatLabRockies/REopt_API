@@ -17,7 +17,6 @@ Xpress = "9e70acf3-d6c9-5be6-b5bd-4e2c73e3e054"
 
 [sources]
 GhpGhx = {rev = "main", url = "https://github.com/NatLabRockies/GhpGhx.jl.git"}
-REopt = {rev = "master", url = "https://github.com/NatLabRockies/REopt.jl.git"}
 
 [compat]
 PROJ_jll = "902"
