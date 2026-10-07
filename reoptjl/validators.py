@@ -226,7 +226,8 @@ class InputValidator(object):
         """
         PV validation
         """
-        def cross_clean_pv(pvmodel):     
+        def cross_clean_pv(pv_key):
+            pvmodel = self.models[pv_key]
             if pvmodel.__getattribute__("tilt") is None:
                 if pvmodel.__getattribute__("array_type") in (pvmodel.ARRAY_TYPE_CHOICES.GROUND_MOUNT_FIXED_OPEN_RACK, 
                                                             pvmodel.ARRAY_TYPE_CHOICES.ROOFTOP_FIXED):
@@ -243,7 +244,7 @@ class InputValidator(object):
             
             if pvmodel.__getattribute__("max_kw") > 0:
                 if len(pvmodel.__getattribute__("production_factor_series")) > 0:
-                    self.clean_time_series("PV", "production_factor_series")
+                    self.clean_time_series(pv_key, "production_factor_series")
             
             if self.models["Settings"].off_grid_flag==True:
                 pvmodel.__setattr__("can_net_meter", False)
@@ -254,7 +255,8 @@ class InputValidator(object):
             else:
                 pvmodel.__setattr__("operating_reserve_required_fraction", 0.0) # override any user provided values
 
-        def update_pv_defaults_offgrid(self, pvmodel):
+        def update_pv_defaults_offgrid(self, pv_key):
+            pvmodel = self.models[pv_key]
             if pvmodel.__getattribute__("can_net_meter") == None:
                 if self.models["Settings"].off_grid_flag==False:
                     pvmodel.__setattr__("can_net_meter", True)
@@ -280,13 +282,13 @@ class InputValidator(object):
                     pvmodel.__setattr__("operating_reserve_required_fraction", 0.25)
 
         if "PV" in self.models.keys():  # single PV
-            cross_clean_pv(self.models["PV"])
-            update_pv_defaults_offgrid(self, self.models["PV"])
+            cross_clean_pv("PV")
+            update_pv_defaults_offgrid(self, "PV")
 
         if len(self.pvnames) > 0:  # multiple PV
             for pvname in self.pvnames:
-                cross_clean_pv(self.models[pvname])
-                update_pv_defaults_offgrid(self, self.models[pvname])
+                cross_clean_pv(pvname)
+                update_pv_defaults_offgrid(self, pvname)
 
         """
         CHP validation

@@ -11,13 +11,14 @@ class REoptError(Exception):
     Base class for exceptions in reo app.
     """
 
-    def __init__(self, task='', name='', run_uuid='', message='', traceback='', user_uuid=''):
+    def __init__(self, task='', name='', run_uuid='', message='', traceback='', user_uuid='', portfolio_uuid=''):
         """
 
         :param task: task where error occurred, e.g. scenario_setup, reopt, process_results
         :param name: name of error class, e.g. SubprocessTimeout
         :param run_uuid:
         :param user_uuid:
+        :param portfolio_uuid:
         :param message: message that is sent back to user in messages: errors
         :param traceback: sys.exc_info()[2]
         """
@@ -46,6 +47,7 @@ class REoptError(Exception):
         self.task = task
         self.run_uuid = run_uuid
         self.user_uuid = user_uuid
+        self.portfolio_uuid = portfolio_uuid
         self.traceback = traceback
         self.name = name
         log.error(traceback)

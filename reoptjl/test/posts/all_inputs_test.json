@@ -115,7 +115,8 @@
         "can_wholesale": true,
         "can_export_beyond_nem_limit": true,
         "can_curtail": true,
-        "operating_reserve_required_fraction": 0.0
+        "operating_reserve_required_fraction": 0.0,
+        "outage_production_fraction": 1.0
     },
     "Meta": {
         "description": "",
@@ -269,7 +270,8 @@
         "can_export_beyond_nem_limit": true,
         "can_curtail": true,
         "operating_reserve_required_fraction": 0.0,
-        "acres_per_kw": 0.03
+        "acres_per_kw": 0.03,
+        "outage_production_fraction": 1.0
     },
     "ExistingBoiler": {
         "production_type": "hot_water",

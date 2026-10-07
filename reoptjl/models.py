@@ -76,10 +76,10 @@ EMISSIONS_DECREASE_DEFAULTS = { # year over year decrease in grid emissions rate
 }
 
 WIND_COST_DEFAULTS = { # size_class_to_installed_cost 
-    "residential" : 7692.0,
-    "commercial" : 5776.0,
-    "medium" : 3807.0,
-    "large" : 2896.0
+    "residential" : 8960.0,
+    "commercial" : 6782.0,
+    "medium" : 4368.0,
+    "large" : 3477.0
 }
 
 def at_least_one_set(model, possible_sets):
@@ -3284,6 +3284,16 @@ class PVInputs(BaseModel, models.Model):
                 "Required operating reserves applied to each timestep as a fraction of PV generation serving load in that timestep.")
     )
 
+    outage_production_fraction = models.FloatField(
+        validators=[
+            MinValueValidator(0),
+            MaxValueValidator(1.0)
+        ],
+        blank=True,
+        default=1.0,
+        help_text=("Fraction of production available during outages. Only applies with multiple outage modeling using inputs outage_start_time_steps and outage_durations.")
+    )
+
 
 class PVOutputs(BaseModel, models.Model):
     key = "PVOutputs"
@@ -3411,7 +3421,7 @@ class WindInputs(BaseModel, models.Model):
         help_text="Installed cost in $/kW. Default cost is determined based on size_class."
     )
     om_cost_per_kw = models.FloatField(
-        default=42,
+        default=43,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0e3)
@@ -3624,6 +3634,15 @@ class WindInputs(BaseModel, models.Model):
         blank=True,
         help_text="Land area required per kW of wind capacity in acres/kW; only constrained by this for systems greater than 1500 kW"
     )
+    outage_production_fraction = models.FloatField(
+        validators=[
+            MinValueValidator(0),
+            MaxValueValidator(1.0)
+        ],
+        blank=True,
+        default=1.0,
+        help_text=("Fraction of production available during outages. Only applies with multiple outage modeling using inputs outage_start_time_steps and outage_durations.")
+    )
 
     def clean(self):
         if self.size_class != "" and self.installed_cost_per_kw is None:
@@ -3668,6 +3687,15 @@ class ElectricStorageInputs(BaseModel, models.Model):
         primary_key=True
     )
 
+    size_class = models.IntegerField(
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(4)
+        ],
+        null=True,
+        blank=True,
+        help_text="ElectricStorage size class. Must be an integer value between 1 and 4. Default is calculated per ratio of annual peak and average load of given load profile."
+    )
     ELECTRICSTORAGE_DISPATCH_STRATEGY = models.TextChoices('ELECTRICSTORAGE_DISPATCH_STRATEGY', (
         "optimized",
         "peak_shaving_look_ahead",
@@ -3812,29 +3840,29 @@ class ElectricStorageInputs(BaseModel, models.Model):
                    "that energy at the export_rate_beyond_net_metering_limit).")
     )
     installed_cost_per_kw = models.FloatField(
-        default=968.0,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0e4)
         ],
+        null=True,
         blank=True,
         help_text="Total upfront battery power capacity costs (e.g. inverter and balance of power systems)"
     )
     installed_cost_per_kwh = models.FloatField(
-        default=253.0,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0e4)
         ],
+        null=True,
         blank=True,
         help_text="Total upfront battery costs"
     )
     installed_cost_constant = models.FloatField(
-        default=222115.0,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0e9)
         ],
+        null=True,
         blank=True,
         help_text="Fixed upfront cost for battery installation, independent of size."
     )
@@ -3893,7 +3921,7 @@ class ElectricStorageInputs(BaseModel, models.Model):
         help_text="Number of years from start of analysis period to apply replace_cost_constant."
     )
     om_cost_fraction_of_installed_cost = models.FloatField(
-        default=0.025,
+        default=0.04,
         validators=[
             MinValueValidator(0),
             MaxValueValidator(1.0)
@@ -4642,17 +4670,17 @@ class CHPInputs(BaseModel, models.Model):
         blank=True,
         help_text="Maximum rate of change in electric production per hour as a fraction of size_kw [kW/size_kw/hour]."
     )
-    supplementary_firing_capital_cost_per_kw = models.FloatField(
-        default=150,
+    supplementary_firing_installed_cost_per_mmbtu_per_hour = models.FloatField(
+        default=20000.0,
         validators=[
             MinValueValidator(0.0),
-            MaxValueValidator(1.0e5)
+            MaxValueValidator(1.0e7)
         ],
         null=True, 
         blank=True,
-        help_text="Installed CHP supplementary firing system cost in $/kWe"
+        help_text="Installed CHP supplementary firing system cost in $/MMBtu/hr of incremental thermal capacity"
     )
-    supplementary_firing_max_steam_ratio = models.FloatField(
+    supplementary_firing_max_ratio = models.FloatField(
         default=1.0,
         validators=[
             MinValueValidator(0.0),
@@ -4660,7 +4688,10 @@ class CHPInputs(BaseModel, models.Model):
         ],
         null=True, 
         blank=True,
-        help_text="Ratio of max fired steam to un-fired steam production. Relevant only for combustion_turbine prime_mover"
+        help_text=(
+            "Ratio of max fired steam capacity relative to the steam generated by the CHP system when running at "
+            "rated capacity. Relevant only for combustion_turbine prime_mover"
+        )
     )
     supplementary_firing_efficiency =models.FloatField(
         default=0.92,
@@ -5049,9 +5080,20 @@ class CHPOutputs(BaseModel, models.Model):
         null=True, blank=True,
         help_text="Power capacity size of the existing CHP system in BAU [kW]"
     )
-    size_supplemental_firing_kw = models.FloatField(
+    size_supplemental_firing_mmbtu_per_hour = models.FloatField(
         null=True, blank=True,
-        help_text="Power capacity of CHP supplementary firing system [kW]"
+        help_text="Incremental thermal capacity of the CHP supplementary firing system [MMBtu/hr]"
+    )
+    size_supplementary_firing_ratio = models.FloatField(
+        null=True, blank=True,
+        help_text=(
+            "Ratio of total fired thermal capacity (unfired + supplementary firing) to unfired CHP thermal "
+            "capacity at full load [-]"
+        )
+    )
+    annual_supplementary_firing_thermal_production_mmbtu = models.FloatField(
+        null=True, blank=True,
+        help_text="Supplementary firing thermal energy produced in a year [MMBtu]"
     )
     annual_fuel_consumption_mmbtu = models.FloatField(
         null=True, blank=True,
