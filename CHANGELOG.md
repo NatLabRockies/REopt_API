@@ -25,6 +25,11 @@ Classify the change according to the following categories:
     ##### Removed
     ### Patches
 
+
+## v3.24.1
+### Patches
+- See https://github.com/NatLabRockies/REopt.jl/releases/tag/v1.0.1 for updates to REopt.jl
+
 ## v3.24.0
 ### Minor Updates
 ##### Added
