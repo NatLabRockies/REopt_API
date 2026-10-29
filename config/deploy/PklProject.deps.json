@@ -8,9 +8,9 @@
         "sha256": "0520f82219c074d2f4b69ab9c57a4a1c1d0b3c4acc1e5d12749e72e0d567d9bf"
       }
     },
-    "package://github.nrel.gov/TADA/tada-shared-kube@0": {
+    "package://github.nlr.gov/TADA/tada-shared-kube@0": {
       "type": "local",
-      "uri": "projectpackage://github.nrel.gov/TADA/tada-shared-kube@0.1.0",
+      "uri": "projectpackage://github.nlr.gov/TADA/tada-shared-kube@0.1.0",
       "path": "external/tada-shared-kube"
     },
     "package://pkg.pkl-lang.org/pkl-pantry/pkl.experimental.deepToTyped@1": {
