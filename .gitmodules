@@ -1,4 +1,4 @@
 [submodule "EVI-EnLitePy"]
 	path = EVI-EnLitePy
-	url = https://github.nrel.gov/AVCI/EVI-EnLitePy.git
+	url = https://github.nlr.gov/AVCI/EVI-EnLitePy.git
     branch = server_version
