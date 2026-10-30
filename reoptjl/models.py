@@ -1770,9 +1770,6 @@ class ElectricTariffInputs(BaseModel, models.Model):
                 if (possible_set[0] and not possible_set[1]) or (not possible_set[0] and possible_set[1]):
                     error_messages["required inputs"] = f"Must provide both {possible_set[0]} and {possible_set[1]}"
 
-        self.wholesale_rate = scalar_or_monthly_to_8760(self.wholesale_rate)
-        self.export_rate_beyond_net_metering_limit = scalar_or_monthly_to_8760(self.export_rate_beyond_net_metering_limit)
-
         if len(self.coincident_peak_load_charge_per_kw) > 0:
             if len(self.coincident_peak_load_active_time_steps) != len(self.coincident_peak_load_charge_per_kw):
                 error_messages["coincident peak"] = (
@@ -5234,10 +5231,6 @@ class CHPInputs(BaseModel, models.Model):
         if error_messages:
             raise ValidationError(error_messages)
 
-        self.fuel_cost_per_mmbtu = scalar_or_monthly_to_8760(self.fuel_cost_per_mmbtu)
-        if has_fuel2:
-            self.fuel2_cost_per_mmbtu = scalar_or_monthly_to_8760(self.fuel2_cost_per_mmbtu)
-
         for fuel_type, default_fields in [(self.fuel_type, self.FUEL_DEFAULT_FIELDS),
                                           (self.fuel2_type, self.FUEL2_DEFAULT_FIELDS)]:
             if fuel_type is None or fuel_type == "custom":
@@ -6044,8 +6037,6 @@ class ExistingBoilerInputs(BaseModel, models.Model):
 
         if error_messages:
             raise ValidationError(error_messages)
-        
-        self.fuel_cost_per_mmbtu = scalar_or_monthly_to_8760(self.fuel_cost_per_mmbtu)
 
         if self.fuel_renewable_energy_fraction == None:
             self.fuel_renewable_energy_fraction = FUEL_DEFAULTS["fuel_renewable_energy_fraction"].get(self.fuel_type, 0.0)
@@ -7062,8 +7053,6 @@ class BoilerInputs(BaseModel, models.Model):
 
         if error_messages:
             raise ValidationError(error_messages)
-        
-        self.fuel_cost_per_mmbtu = scalar_or_monthly_to_8760(self.fuel_cost_per_mmbtu)
 
 class BoilerOutputs(BaseModel, models.Model):
 
@@ -9894,17 +9883,25 @@ def get_input_dict_from_run_uuid(run_uuid:str):
     except: pass
 
 
-    return d
+    return length_one_lists_to_scalars(d)
 
 '''
-If a scalar was provided where API expects a vector, extend it to 8760
-Upsampling handled in InputValidator.cross_clean
+REopt.jl expects a scalar, not a length-1 vector, for these inputs. Scalar and monthly values are stored as provided
+(not expanded to 8760), and REopt.jl expands them internally.
 '''
-def scalar_or_monthly_to_8760(vec:list):
-    if len(vec) == 1: # scalar length is provided
-        return vec * 8760
-    elif len(vec) == 12: # Monthly costs were provided
-        days_per_month = [31,28,31,30,31,30,31,31,30,31,30,31]
-        return numpy.repeat(vec, [i * 24 for i in days_per_month]).tolist()
-    else:
-        return vec # the vector len was not 1 or 12, handle it elsewhere
+SCALAR_OR_VECTOR_INPUTS = {
+    "ElectricTariff": ["wholesale_rate", "export_rate_beyond_net_metering_limit"],
+    "ExistingBoiler": ["fuel_cost_per_mmbtu"],
+    "Boiler": ["fuel_cost_per_mmbtu"],
+    "CHP": ["fuel_cost_per_mmbtu", "fuel2_cost_per_mmbtu"],
+}
+
+def length_one_lists_to_scalars(d:dict):
+    for model_key, field_names in SCALAR_OR_VECTOR_INPUTS.items():
+        for model_dict in (d[model_key] if isinstance(d.get(model_key), list) else [d.get(model_key)]):
+            if not model_dict:
+                continue
+            for field_name in field_names:
+                if isinstance(model_dict.get(field_name), list) and len(model_dict[field_name]) == 1:
+                    model_dict[field_name] = model_dict[field_name][0]
+    return d
