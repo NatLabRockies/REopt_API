@@ -1770,9 +1770,6 @@ class ElectricTariffInputs(BaseModel, models.Model):
                 if (possible_set[0] and not possible_set[1]) or (not possible_set[0] and possible_set[1]):
                     error_messages["required inputs"] = f"Must provide both {possible_set[0]} and {possible_set[1]}"
 
-        self.wholesale_rate = scalar_or_monthly_to_8760(self.wholesale_rate)
-        self.export_rate_beyond_net_metering_limit = scalar_or_monthly_to_8760(self.export_rate_beyond_net_metering_limit)
-
         if len(self.coincident_peak_load_charge_per_kw) > 0:
             if len(self.coincident_peak_load_active_time_steps) != len(self.coincident_peak_load_charge_per_kw):
                 error_messages["coincident peak"] = (
@@ -4471,7 +4468,8 @@ class CHPInputs(BaseModel, models.Model):
         "natural_gas",
         "landfill_bio_gas",
         "propane",
-        "diesel_oil"
+        "diesel_oil",
+        "custom"
     ))
 
     #Always required
@@ -4640,7 +4638,11 @@ class CHPInputs(BaseModel, models.Model):
         blank=True,
         choices=FUEL_TYPE_LIST.choices,
         default="natural_gas",
-        help_text="Existing CHP fuel type, one of natural_gas, landfill_bio_gas, propane, diesel_oil"
+        help_text=(
+            "Existing CHP fuel type, one of natural_gas, landfill_bio_gas, propane, diesel_oil, custom. If custom, "
+            "fuel_cost_escalation_rate_fraction, fuel_renewable_energy_fraction and all emissions_factor_lb_*_per_mmbtu "
+            "inputs are required."
+        )
     )
     om_cost_per_kw = models.FloatField(
         default=0.0,
@@ -4984,7 +4986,7 @@ class CHPInputs(BaseModel, models.Model):
         ],
         blank=True,
         null=True,
-        help_text="Fraction of the CHP fuel considered renewable. Default depends on fuel type."
+        help_text="Fraction of the CHP fuel considered renewable. Default depends on fuel type. Required if fuel_type is custom."
     )
     emissions_factor_lb_CO2_per_mmbtu = models.FloatField(
         validators=[
@@ -4993,7 +4995,7 @@ class CHPInputs(BaseModel, models.Model):
         ],
         blank=True,
         null=True,
-        help_text="Pounds of CO2 emitted per MMBTU of CHP fuel burned."
+        help_text="Pounds of CO2 emitted per MMBTU of CHP fuel burned. Default depends on fuel type. Required if fuel_type is custom."
     )
     emissions_factor_lb_NOx_per_mmbtu = models.FloatField(
         validators=[
@@ -5002,7 +5004,7 @@ class CHPInputs(BaseModel, models.Model):
         ],
         blank=True,
         null=True,
-        help_text="Pounds of CO2 emitted per MMBTU of CHP fuel burned."
+        help_text="Pounds of NOx emitted per MMBTU of CHP fuel burned. Default depends on fuel type. Required if fuel_type is custom."
     )
     emissions_factor_lb_SO2_per_mmbtu = models.FloatField(
         validators=[
@@ -5011,7 +5013,7 @@ class CHPInputs(BaseModel, models.Model):
         ],
         blank=True,
         null=True,
-        help_text="Pounds of CO2 emitted per MMBTU of CHP fuel burned."
+        help_text="Pounds of SO2 emitted per MMBTU of CHP fuel burned. Default depends on fuel type. Required if fuel_type is custom."
     )
     emissions_factor_lb_PM25_per_mmbtu = models.FloatField(
         validators=[
@@ -5020,7 +5022,7 @@ class CHPInputs(BaseModel, models.Model):
         ],
         blank=True,
         null=True,
-        help_text="Pounds of CO2 emitted per MMBTU of CHP fuel burned."
+        help_text="Pounds of PM2.5 emitted per MMBTU of CHP fuel burned. Default depends on fuel type. Required if fuel_type is custom."
     )
     fuel_cost_escalation_rate_fraction = models.FloatField(
         validators=[
@@ -5029,33 +5031,213 @@ class CHPInputs(BaseModel, models.Model):
         ],
         null=True,
         blank=True,
-        help_text="Annual nominal chp fuel cost escalation rate, as a decimal."
+        help_text="Annual nominal chp fuel cost escalation rate, as a decimal. Required if fuel_type is custom."
     )
-    
+
+    # Dual fuel: second fuel (fuel2). Used to fill the gap above fuel_max_mmbtu_per_period, or after fuel2_switch_start_year
+    fuel2_type = models.TextField(
+        null=True,
+        blank=True,
+        choices=FUEL_TYPE_LIST.choices,
+        help_text=(
+            "Second CHP fuel type, one of natural_gas, landfill_bio_gas, propane, diesel_oil, custom. Providing "
+            "fuel2_type indicates that dual fuel is modeled and requires fuel2_cost_per_mmbtu; if any other fuel2 input "
+            "is provided without fuel2_type it defaults to natural_gas (same as fuel_type). If custom, "
+            "fuel2_cost_escalation_rate_fraction, fuel2_renewable_energy_fraction and all fuel2_emissions_factor_lb_*_per_mmbtu "
+            "inputs are required. If provided with fuel_max_period, fuel2_type supplies the fuel needed above the "
+            "fuel_type limit; otherwise fuel_max_mmbtu_per_period simply caps the CHP fuel burn."
+        )
+    )
+    fuel2_cost_per_mmbtu = ArrayField(
+        models.FloatField(
+            blank=True,
+            validators=[
+                MinValueValidator(0)
+            ]
+        ),
+        default=list,
+        null=False,
+        blank=True,
+        help_text=(
+            "Cost of fuel2_type in today's dollars. Required if fuel2_type is provided. Like fuel_cost_per_mmbtu, it can "
+            "be a scalar, a list of 12 monthly values, or a time series of values for every time step, and it escalates "
+            "from year 1 at fuel2_cost_escalation_rate_fraction, including before any fuel2_switch_start_year."
+        )
+    )
+    fuel2_cost_escalation_rate_fraction = models.FloatField(
+        validators=[
+            MinValueValidator(-1.0),
+            MaxValueValidator(1.0)
+        ],
+        null=True,
+        blank=True,
+        help_text=(
+            "Annual nominal escalation rate of fuel2_cost_per_mmbtu, as a decimal, applied from year 1. Use a low or "
+            "negative value to represent an expected price decline. Defaults to fuel_cost_escalation_rate_fraction if provided, otherwise Financial.chp_fuel_cost_escalation_rate_fraction. "
+            "Required if fuel2_type is custom."
+        )
+    )
+    fuel2_renewable_energy_fraction = models.FloatField(
+        validators=[
+            MinValueValidator(0),
+            MaxValueValidator(1)
+        ],
+        blank=True,
+        null=True,
+        help_text="Fraction of the CHP fuel2_type considered renewable. Default depends on fuel2_type. Required if fuel2_type is custom."
+    )
+    fuel2_emissions_factor_lb_CO2_per_mmbtu = models.FloatField(
+        validators=[
+            MinValueValidator(0),
+            MaxValueValidator(1e4)
+        ],
+        blank=True,
+        null=True,
+        help_text="Pounds of CO2 emitted per MMBTU of CHP fuel2_type burned. Default depends on fuel2_type. Required if fuel2_type is custom."
+    )
+    fuel2_emissions_factor_lb_NOx_per_mmbtu = models.FloatField(
+        validators=[
+            MinValueValidator(0),
+            MaxValueValidator(1e4)
+        ],
+        blank=True,
+        null=True,
+        help_text="Pounds of NOx emitted per MMBTU of CHP fuel2_type burned. Default depends on fuel2_type. Required if fuel2_type is custom."
+    )
+    fuel2_emissions_factor_lb_SO2_per_mmbtu = models.FloatField(
+        validators=[
+            MinValueValidator(0),
+            MaxValueValidator(1e4)
+        ],
+        blank=True,
+        null=True,
+        help_text="Pounds of SO2 emitted per MMBTU of CHP fuel2_type burned. Default depends on fuel2_type. Required if fuel2_type is custom."
+    )
+    fuel2_emissions_factor_lb_PM25_per_mmbtu = models.FloatField(
+        validators=[
+            MinValueValidator(0),
+            MaxValueValidator(1e4)
+        ],
+        blank=True,
+        null=True,
+        help_text="Pounds of PM2.5 emitted per MMBTU of CHP fuel2_type burned. Default depends on fuel2_type. Required if fuel2_type is custom."
+    )
+
+    # Dual fuel mode 1: limit the fuel_type consumption within each period (mutually exclusive with fuel2_switch_start_year)
+    FUEL_MAX_PERIOD = models.TextChoices('FUEL_MAX_PERIOD', (
+        "hour",
+        "day",
+        "week",
+        "month"
+    ))
+
+    fuel_max_period = models.TextField(
+        null=True,
+        blank=True,
+        choices=FUEL_MAX_PERIOD.choices,
+        help_text=(
+            "Period over which fuel_max_mmbtu_per_period applies, one of hour, day, week, month. Must be provided "
+            "together with fuel_max_mmbtu_per_period. 'hour' limits the fuel burn rate in every time step; 'day', "
+            "'week' and 'month' limit the total fuel burned within each period. Cannot be combined with fuel2_switch_start_year."
+        )
+    )
+    fuel_max_mmbtu_per_period = models.FloatField(
+        validators=[
+            MinValueValidator(0.0),
+            MaxValueValidator(MAX_BIG_NUMBER)
+        ],
+        null=True,
+        blank=True,
+        help_text=(
+            "Maximum fuel_type consumption [MMBtu] within each fuel_max_period. Must be provided together with "
+            "fuel_max_period. If fuel2_type is provided, fuel2_type supplies the fuel needed above this limit; "
+            "otherwise this is a hard cap on the CHP fuel burn."
+        )
+    )
+
+    # Dual fuel mode 2: long-term fuel switch (mutually exclusive with fuel_max_period)
+    fuel2_switch_start_year = models.IntegerField(
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(75)
+        ],
+        null=True,
+        blank=True,
+        help_text=(
+            "First year (1 = year 1 of the analysis period) in which fuel2_type is used instead of fuel_type, through "
+            "the end of the analysis period. fuel_type is used in the preceding years. Requires fuel2_type and "
+            "fuel2_cost_per_mmbtu. Cannot be combined with fuel_max_period."
+        )
+    )
+
+    # (field, FUEL_DEFAULTS key) pairs for the fuel and fuel2 inputs with defaults that depend on the fuel type.
+    # These (plus the cost escalation rate) have no default, and so are required, when the fuel type is "custom".
+    FUEL_DEFAULT_FIELDS = (
+        ("fuel_renewable_energy_fraction", "fuel_renewable_energy_fraction"),
+        ("emissions_factor_lb_CO2_per_mmbtu", "emissions_factor_lb_CO2_per_mmbtu"),
+        ("emissions_factor_lb_SO2_per_mmbtu", "emissions_factor_lb_SO2_per_mmbtu"),
+        ("emissions_factor_lb_NOx_per_mmbtu", "emissions_factor_lb_NOx_per_mmbtu"),
+        ("emissions_factor_lb_PM25_per_mmbtu", "emissions_factor_lb_PM25_per_mmbtu"),
+    )
+    FUEL2_DEFAULT_FIELDS = (
+        ("fuel2_renewable_energy_fraction", "fuel_renewable_energy_fraction"),
+        ("fuel2_emissions_factor_lb_CO2_per_mmbtu", "emissions_factor_lb_CO2_per_mmbtu"),
+        ("fuel2_emissions_factor_lb_SO2_per_mmbtu", "emissions_factor_lb_SO2_per_mmbtu"),
+        ("fuel2_emissions_factor_lb_NOx_per_mmbtu", "emissions_factor_lb_NOx_per_mmbtu"),
+        ("fuel2_emissions_factor_lb_PM25_per_mmbtu", "emissions_factor_lb_PM25_per_mmbtu"),
+    )
+
     def clean(self):
         error_messages = {}
         if not self.dict.get("fuel_cost_per_mmbtu"):
             error_messages["required inputs"] = "Must provide fuel_cost_per_mmbtu to model {}".format(self.key)
 
+        # Providing fuel2_type indicates dual fuel. Any other fuel2 input also indicates dual fuel, in which case
+        # fuel2_type defaults to natural_gas (same as the fuel_type default)
+        other_fuel2_inputs = [self.dict.get("fuel2_cost_per_mmbtu"), self.fuel2_cost_escalation_rate_fraction,
+                              self.fuel2_switch_start_year] + [getattr(self, f) for f, _ in self.FUEL2_DEFAULT_FIELDS]
+        if self.fuel2_type is None and any(v not in (None, []) for v in other_fuel2_inputs):
+            self.fuel2_type = "natural_gas"
+
+        has_fuel2 = self.fuel2_type is not None
+        has_fuel2_cost = bool(self.dict.get("fuel2_cost_per_mmbtu"))
+        has_fuel_switch = self.fuel2_switch_start_year is not None
+        has_fuel_max_period = self.fuel_max_period is not None
+        has_fuel_max_mmbtu = self.fuel_max_mmbtu_per_period is not None
+
+        if has_fuel2 and not has_fuel2_cost:
+            error_messages["fuel2_cost_per_mmbtu"] = "Must provide fuel2_cost_per_mmbtu when fuel2_type or any other fuel2 input is provided to model {}".format(self.key)
+        if has_fuel_max_period != has_fuel_max_mmbtu:
+            error_messages["fuel_max_period"] = "fuel_max_period and fuel_max_mmbtu_per_period must be provided together to model {}".format(self.key)
+        if has_fuel_switch and (has_fuel_max_period or has_fuel_max_mmbtu):
+            error_messages["fuel2_switch_start_year"] = (
+                "fuel2_switch_start_year (long-term fuel switch) cannot be combined with fuel_max_period and "
+                "fuel_max_mmbtu_per_period (fuel limit) to model {}".format(self.key)
+            )
+
+        # A custom fuel has no default renewable fraction, emissions factors or cost escalation rate
+        for type_name, fuel_type, required_fields in [
+            ("fuel_type", self.fuel_type,
+             ["fuel_cost_escalation_rate_fraction"] + [f for f, _ in self.FUEL_DEFAULT_FIELDS]),
+            ("fuel2_type", self.fuel2_type,
+             ["fuel2_cost_escalation_rate_fraction"] + [f for f, _ in self.FUEL2_DEFAULT_FIELDS]),
+        ]:
+            if fuel_type == "custom":
+                missing = [f for f in required_fields if getattr(self, f) is None]
+                if missing:
+                    error_messages[type_name] = "Must provide {} when {} is custom to model {}".format(
+                        ", ".join(missing), type_name, self.key)
+
         if error_messages:
             raise ValidationError(error_messages)
 
-        self.fuel_cost_per_mmbtu = scalar_or_monthly_to_8760(self.fuel_cost_per_mmbtu)
-
-        if self.fuel_renewable_energy_fraction == None:
-            self.fuel_renewable_energy_fraction = FUEL_DEFAULTS["fuel_renewable_energy_fraction"].get(self.fuel_type, 0.0)
-
-        if self.emissions_factor_lb_CO2_per_mmbtu == None:
-            self.emissions_factor_lb_CO2_per_mmbtu = FUEL_DEFAULTS["emissions_factor_lb_CO2_per_mmbtu"].get(self.fuel_type, 0.0)
-        
-        if self.emissions_factor_lb_SO2_per_mmbtu == None:
-            self.emissions_factor_lb_SO2_per_mmbtu = FUEL_DEFAULTS["emissions_factor_lb_SO2_per_mmbtu"].get(self.fuel_type, 0.0)
-        
-        if self.emissions_factor_lb_NOx_per_mmbtu == None:
-            self.emissions_factor_lb_NOx_per_mmbtu = FUEL_DEFAULTS["emissions_factor_lb_NOx_per_mmbtu"].get(self.fuel_type, 0.0)
-        
-        if self.emissions_factor_lb_PM25_per_mmbtu == None:
-            self.emissions_factor_lb_PM25_per_mmbtu = FUEL_DEFAULTS["emissions_factor_lb_PM25_per_mmbtu"].get(self.fuel_type, 0.0)
+        for fuel_type, default_fields in [(self.fuel_type, self.FUEL_DEFAULT_FIELDS),
+                                          (self.fuel2_type, self.FUEL2_DEFAULT_FIELDS)]:
+            if fuel_type is None or fuel_type == "custom":
+                continue  # no fuel2, or custom values were required above
+            for field, defaults_key in default_fields:
+                if getattr(self, field) is None:
+                    setattr(self, field, FUEL_DEFAULTS[defaults_key].get(fuel_type, 0.0))
 
 
 class CHPOutputs(BaseModel, models.Model):
@@ -5102,6 +5284,13 @@ class CHPOutputs(BaseModel, models.Model):
     annual_fuel_consumption_mmbtu_bau = models.FloatField(
         null=True, blank=True,
         help_text="Fuel consumed in a year by the existing CHP system in BAU [MMBtu]"
+    )
+    annual_fuel2_consumption_mmbtu = models.FloatField(
+        null=True, blank=True,
+        help_text=(
+            "Fuel2 consumed in a year [MMBtu]. Only for dual-fuel CHP. annual_fuel_consumption_mmbtu is the combined "
+            "fuel and fuel2 total"
+        )
     )
     annual_electric_production_kwh = models.FloatField(
         null=True, blank=True,
@@ -5220,6 +5409,31 @@ class CHPOutputs(BaseModel, models.Model):
     lifecycle_fuel_cost_after_tax_bau = models.FloatField(
         null=True, blank=True,
         help_text="Present value of cost of fuel consumed by the existing CHP system in BAU, after tax [$]"
+    )
+    year_one_fuel2_cost_before_tax = models.FloatField(
+        null=True, blank=True,
+        help_text=(
+            "Cost of fuel2 consumed by the CHP system in year one [$]. Only for dual-fuel CHP. "
+            "year_one_fuel_cost_before_tax is the combined fuel and fuel2 total. With fuel2_switch_start_year, fuel2 is "
+            "not used in year one, so this is the hypothetical year-one cost of fuel2 (its input price applied to the "
+            "year-one dispatch) and year_one_fuel_cost_before_tax is fuel only"
+        )
+    )
+    year_one_fuel2_cost_after_tax = models.FloatField(
+        null=True, blank=True,
+        help_text=(
+            "Cost of fuel2 consumed by the CHP system in year one, after tax [$]. Only for dual-fuel CHP. "
+            "year_one_fuel_cost_after_tax is the combined fuel and fuel2 total. With fuel2_switch_start_year, fuel2 is "
+            "not used in year one, so this is the hypothetical year-one cost of fuel2 (its input price applied to the "
+            "year-one dispatch) and year_one_fuel_cost_after_tax is fuel only"
+        )
+    )
+    lifecycle_fuel2_cost_after_tax = models.FloatField(
+        null=True, blank=True,
+        help_text=(
+            "Present value of cost of fuel2 consumed by the CHP system, after tax [$]. Only for dual-fuel CHP. "
+            "lifecycle_fuel_cost_after_tax is the combined fuel and fuel2 total"
+        )
     )
     year_one_standby_cost_before_tax = models.FloatField(
         null=True, blank=True,
@@ -5823,8 +6037,6 @@ class ExistingBoilerInputs(BaseModel, models.Model):
 
         if error_messages:
             raise ValidationError(error_messages)
-        
-        self.fuel_cost_per_mmbtu = scalar_or_monthly_to_8760(self.fuel_cost_per_mmbtu)
 
         if self.fuel_renewable_energy_fraction == None:
             self.fuel_renewable_energy_fraction = FUEL_DEFAULTS["fuel_renewable_energy_fraction"].get(self.fuel_type, 0.0)
@@ -6841,8 +7053,6 @@ class BoilerInputs(BaseModel, models.Model):
 
         if error_messages:
             raise ValidationError(error_messages)
-        
-        self.fuel_cost_per_mmbtu = scalar_or_monthly_to_8760(self.fuel_cost_per_mmbtu)
 
 class BoilerOutputs(BaseModel, models.Model):
 
@@ -9673,17 +9883,25 @@ def get_input_dict_from_run_uuid(run_uuid:str):
     except: pass
 
 
-    return d
+    return length_one_lists_to_scalars(d)
 
 '''
-If a scalar was provided where API expects a vector, extend it to 8760
-Upsampling handled in InputValidator.cross_clean
+REopt.jl expects a scalar, not a length-1 vector, for these inputs. Scalar and monthly values are stored as provided
+(not expanded to 8760), and REopt.jl expands them internally.
 '''
-def scalar_or_monthly_to_8760(vec:list):
-    if len(vec) == 1: # scalar length is provided
-        return vec * 8760
-    elif len(vec) == 12: # Monthly costs were provided
-        days_per_month = [31,28,31,30,31,30,31,31,30,31,30,31]
-        return numpy.repeat(vec, [i * 24 for i in days_per_month]).tolist()
-    else:
-        return vec # the vector len was not 1 or 12, handle it elsewhere
+SCALAR_OR_VECTOR_INPUTS = {
+    "ElectricTariff": ["wholesale_rate", "export_rate_beyond_net_metering_limit"],
+    "ExistingBoiler": ["fuel_cost_per_mmbtu"],
+    "Boiler": ["fuel_cost_per_mmbtu"],
+    "CHP": ["fuel_cost_per_mmbtu", "fuel2_cost_per_mmbtu"],
+}
+
+def length_one_lists_to_scalars(d:dict):
+    for model_key, field_names in SCALAR_OR_VECTOR_INPUTS.items():
+        for model_dict in (d[model_key] if isinstance(d.get(model_key), list) else [d.get(model_key)]):
+            if not model_dict:
+                continue
+            for field_name in field_names:
+                if isinstance(model_dict.get(field_name), list) and len(model_dict[field_name]) == 1:
+                    model_dict[field_name] = model_dict[field_name][0]
+    return d
