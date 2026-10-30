@@ -25,6 +25,19 @@ Classify the change according to the following categories:
     ##### Removed
     ### Patches
 
+## dual-fuel-chp
+### Minor Updates
+##### Added
+- `reoptjl/models.py`: Added dual-fuel CHP inputs to **CHPInputs** to match REopt.jl. A second fuel is specified with **fuel2_type**, **fuel2_cost_per_mmbtu** (today's dollars; scalar, 12 monthly values or a time series), **fuel2_cost_escalation_rate_fraction** (applied from year 1; defaults to **fuel_cost_escalation_rate_fraction** if provided, otherwise `Financial.chp_fuel_cost_escalation_rate_fraction`), **fuel2_renewable_energy_fraction** and **fuel2_emissions_factor_lb_CO2_per_mmbtu**, **fuel2_emissions_factor_lb_NOx_per_mmbtu**, **fuel2_emissions_factor_lb_SO2_per_mmbtu**, **fuel2_emissions_factor_lb_PM25_per_mmbtu** (the renewable fraction and emissions factors default based on **fuel2_type**)
+- `reoptjl/models.py`: Added **CHPInputs.fuel_max_period** [hour, day, week, month] and **CHPInputs.fuel_max_mmbtu_per_period** to limit the **fuel_type** consumption within each period. An _hour_ period limits the fuel burn rate in every time step, while _day_, _week_ and _month_ limit the total fuel burned within each period. If **fuel2_type** is provided it supplies the fuel needed above the limit, otherwise the limit is a hard cap on the CHP fuel burn
+- `reoptjl/models.py`: Added **CHPInputs.fuel2_switch_start_year** for a long-term fuel switch from **fuel_type** to **fuel2_type**, starting in the given year of the analysis period. It cannot be combined with **fuel_max_period** and **fuel_max_mmbtu_per_period**
+- `reoptjl/models.py`: Added "custom" as a **CHPInputs.fuel_type** and **CHPInputs.fuel2_type** choice. A custom fuel has no defaults, so **fuel_cost_escalation_rate_fraction**, **fuel_renewable_energy_fraction** and all **emissions_factor_lb_*_per_mmbtu** inputs are required when **fuel_type** is custom, and the corresponding **fuel2_cost_escalation_rate_fraction**, **fuel2_renewable_energy_fraction** and **fuel2_emissions_factor_lb_*_per_mmbtu** inputs are required when **fuel2_type** is custom
+- `reoptjl/models.py`: Added dual-fuel validation to **CHPInputs.clean**. Providing **fuel2_type** indicates that dual fuel is modeled and requires **fuel2_cost_per_mmbtu**. If any other fuel2 input (including **fuel2_switch_start_year**) is provided without **fuel2_type**, it defaults to "natural_gas", the same as the **fuel_type** default. **fuel_max_period** and **fuel_max_mmbtu_per_period** must be provided together, and **fuel2_switch_start_year** cannot be combined with **fuel_max_period**. **fuel2_cost_per_mmbtu** is expanded to a time series like **fuel_cost_per_mmbtu**, and the fuel2 renewable fraction and emissions factors are filled in from defaults for non-custom fuels
+- `reoptjl/models.py`: Added dual-fuel CHP outputs to **CHPOutputs**: **annual_fuel2_consumption_mmbtu**, **year_one_fuel2_cost_before_tax**, **year_one_fuel2_cost_after_tax**, and **lifecycle_fuel2_cost_after_tax**. With **fuel2_switch_start_year**, fuel2 is not used in year one, so **year_one_fuel2_cost_before_tax** and **year_one_fuel2_cost_after_tax** are the hypothetical year-one cost of fuel2 (its input price applied to the year-one dispatch). The existing combined **annual_fuel_consumption_mmbtu**, **year_one_fuel_cost_before_tax**, **year_one_fuel_cost_after_tax** and **lifecycle_fuel_cost_after_tax** remain the fuel and fuel2 totals
+- `reoptjl/migrations/0131_chpinputs_fuel2_type_and_more.py`: Migration for the dual-fuel CHP inputs and outputs, and the updated **CHPInputs** fuel_type choices and help text
+##### Changed
+- `reoptjl/models.py`: Corrected the **CHPInputs.emissions_factor_lb_NOx_per_mmbtu**, **emissions_factor_lb_SO2_per_mmbtu** and **emissions_factor_lb_PM25_per_mmbtu** help text, which described them as CO2
+
 ## v3.24.0
 ### Minor Updates
 ##### Added
