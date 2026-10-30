@@ -38,6 +38,10 @@ Classify the change according to the following categories:
 ##### Changed
 - `reoptjl/models.py`: Corrected the **CHPInputs.emissions_factor_lb_NOx_per_mmbtu**, **emissions_factor_lb_SO2_per_mmbtu** and **emissions_factor_lb_PM25_per_mmbtu** help text, which described them as CO2
 
+## v3.24.1
+### Patches
+- See https://github.com/NatLabRockies/REopt.jl/releases/tag/v1.0.1 for updates to REopt.jl
+
 ## v3.24.0
 ### Minor Updates
 ##### Added

@@ -1,5 +1,5 @@
 GIT
-  remote: https://github.nrel.gov/TADA/db-syncer.git
+  remote: https://github.nlr.gov/TADA/db-syncer.git
   revision: 1cf266b305701dc0cd84d8f6c4c8e86789abc330
   branch: main
   specs:
@@ -8,7 +8,7 @@ GIT
       rest-client
 
 GIT
-  remote: https://github.nrel.gov/TADA/rails-sql-tasks-enhancer.git
+  remote: https://github.nlr.gov/TADA/rails-sql-tasks-enhancer.git
   revision: 0e460e536e33b5228597c83af4a00d6ca8ef1ec5
   branch: main
   specs:
