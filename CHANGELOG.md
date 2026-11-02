@@ -25,6 +25,16 @@ Classify the change according to the following categories:
     ##### Removed
     ### Patches
 
+## dual-fuel-chp
+### Minor Updates
+##### Added
+- `reoptjl/models.py`: Added dual-fuel CHP inputs to **CHPInputs** to match REopt.jl. A second fuel is set with **fuel2_type**, **fuel2_cost_per_mmbtu**, **fuel2_cost_escalation_rate_fraction**, **fuel2_renewable_energy_fraction** and **fuel2_emissions_factor_lb_{CO2,NOx,SO2,PM25}_per_mmbtu**. It is used either to top up a limited fuel 1, with **fuel_max_period** (hour, day, week or month) and **fuel_max_mmbtu_per_period**, or in place of fuel 1 from **fuel2_switch_start_year** on. **fuel_max_period** without a fuel 2 is a cap on the CHP fuel use. "custom" is now an allowed **fuel_type** and **fuel2_type**, with the escalation rate, renewable fraction and emissions factors provided as inputs. Validation is in **CHPInputs.clean**.
+- `reoptjl/models.py`: Added dual-fuel CHP outputs to **CHPOutputs**: **annual_fuel2_consumption_mmbtu**, **year_one_fuel2_cost_before_tax**, **year_one_fuel2_cost_after_tax** and **lifecycle_fuel2_cost_after_tax**. The existing **annual_fuel_consumption_mmbtu**, **year_one_fuel_cost_before_tax**, **year_one_fuel_cost_after_tax** and **lifecycle_fuel_cost_after_tax** are unchanged for single-fuel CHPs and are the fuel and fuel2 totals for dual-fuel CHPs.
+- `reoptjl/models.py`: Added the present worth factors reported by REopt.jl. **FinancialOutputs**: **pwf_e**, **pwf_om**, **pwf_offtaker**, **pwf_owner**, **third_party_factor**, **pwf_fuel_{existing_boiler,boiler,generator}**, **pwf_emissions_cost_{CO2,NOx,SO2,PM25}_{grid,onsite}** and **pwf_grid_emissions_{CO2,NOx,SO2,PM25}**. **CHPOutputs**: **pwf_fuel** and, if dual fuel, **pwf_fuel2**. **PVOutputs**: **levelization_factor**.
+- `reoptjl/migrations/0131_chpinputs_fuel2_type_and_more.py`: Migration for the dual-fuel CHP inputs and outputs, and the updated **CHPInputs** fuel_type choices and help text
+- `reoptjl/migrations/0132_chpoutputs_pwf_fuel_chpoutputs_pwf_fuel2_and_more.py`: Migration for the present worth factor outputs
+##### Changed
+- `reoptjl/models.py`: Corrected the **CHPInputs.emissions_factor_lb_NOx_per_mmbtu**, **emissions_factor_lb_SO2_per_mmbtu** and **emissions_factor_lb_PM25_per_mmbtu** help text, which described them as CO2
 
 ## v3.24.1
 ### Patches

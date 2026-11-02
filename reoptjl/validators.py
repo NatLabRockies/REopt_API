@@ -297,6 +297,9 @@ class InputValidator(object):
             if len(self.models[chpmodel_key].production_factor_series) > 0:
                 self.clean_time_series(chpmodel_key, "production_factor_series")
 
+            self.clean_time_series(chpmodel_key, "fuel_cost_per_mmbtu", passthrough_lengths=(1, 12))
+            self.clean_time_series(chpmodel_key, "fuel2_cost_per_mmbtu", passthrough_lengths=(1, 12))
+
             if self.models["Settings"].off_grid_flag:
                 if self.models[chpmodel_key].operating_reserve_required_fraction is None:
                     self.models[chpmodel_key].operating_reserve_required_fraction = 0.0
@@ -358,11 +361,10 @@ class InputValidator(object):
         """
         if "ElectricTariff" in self.models.keys():
 
-            for key, time_series in zip(
-                ["ElectricTariff",              "ElectricTariff",   "ElectricTariff"],
-                ["tou_energy_rates_per_kwh",    "wholesale_rate",   "export_rate_beyond_net_metering_limit"]
-            ):
-                self.clean_time_series(key, time_series)
+            self.clean_time_series("ElectricTariff", "tou_energy_rates_per_kwh")
+            # REopt.jl accepts a scalar (but not monthly) for these export rates
+            for time_series in ["wholesale_rate", "export_rate_beyond_net_metering_limit"]:
+                self.clean_time_series("ElectricTariff", time_series, passthrough_lengths=(1,))
 
             cp_ts_arrays = self.models["ElectricTariff"].__getattribute__("coincident_peak_load_active_time_steps")
             max_ts = 8760 * self.models["Settings"].time_steps_per_hour
@@ -470,7 +472,7 @@ class InputValidator(object):
         """
         if "ExistingBoiler" in self.models.keys():
 
-            self.clean_time_series("ExistingBoiler", "fuel_cost_per_mmbtu")
+            self.clean_time_series("ExistingBoiler", "fuel_cost_per_mmbtu", passthrough_lengths=(1, 12))
 
             if self.models["ExistingBoiler"].efficiency is None:
                 if self.models["ExistingBoiler"].production_type == 'hot_water':
@@ -483,7 +485,7 @@ class InputValidator(object):
         """
         if "Boiler" in self.models.keys():
 
-            self.clean_time_series("Boiler", "fuel_cost_per_mmbtu")
+            self.clean_time_series("Boiler", "fuel_cost_per_mmbtu", passthrough_lengths=(1, 12))
         
         """
         ElectricLoad
@@ -665,8 +667,15 @@ class InputValidator(object):
         else:
             self.resampling_messages[model_key].update({attribute_name: msg})
     
-    def clean_time_series(self, model_key: str, series_name: str):
-        if self.models[model_key].__getattribute__(series_name):
+    def clean_time_series(self, model_key: str, series_name: str, passthrough_lengths: tuple = ()):
+        """
+        :param passthrough_lengths: series lengths (eg. 1 for scalar, 12 for monthly) that are left as provided
+            because REopt.jl expands them internally, which keeps the saved inputs small
+        """
+        series = self.models[model_key].__getattribute__(series_name)
+        if series and len(series) in passthrough_lengths:
+            return
+        if series:
             resampled_series, resampling_msg, err_msg = validate_time_series(
                 self.models[model_key].__getattribute__(series_name),
                 self.models["Settings"].time_steps_per_hour

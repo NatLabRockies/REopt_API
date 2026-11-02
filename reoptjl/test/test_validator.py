@@ -169,16 +169,13 @@ class InputValidatorTests(TestCase):
         self.assertEqual(validator.is_valid, True)
 
         self.assertAlmostEqual(validator.models["ExistingBoiler"].emissions_factor_lb_CO2_per_mmbtu, 117, places=-1)
-        self.assertAlmostEqual(len(validator.models["ExistingBoiler"].fuel_cost_per_mmbtu), 8760)
-        self.assertAlmostEqual(sum(validator.models["ExistingBoiler"].fuel_cost_per_mmbtu), 8760*0.5)
-
-        self.assertAlmostEqual(len(validator.models["Boiler"].fuel_cost_per_mmbtu), 8760)
-        self.assertAlmostEqual(sum(validator.models["Boiler"].fuel_cost_per_mmbtu), 8760*0.25)
+        self.assertEqual(validator.models["ExistingBoiler"].fuel_cost_per_mmbtu, [0.5])
+        self.assertEqual(validator.models["Boiler"].fuel_cost_per_mmbtu, [0.25])
         
         # Ensure Hot Thermal Storage System parameter is loaded from json
         self.assertAlmostEqual(validator.models["HotThermalStorage"].max_gal, 2500.0)
 
-        # Validate 12 month fuel cost vector gets scaled correctly
+        # Monthly fuel cost vectors are not expanded to 8760 (REopt.jl does that internally)
 
         post["ExistingBoiler"]["fuel_cost_per_mmbtu"] = [1,2,1,1,1,1,1,1,1,1,1,1]
         post["Boiler"]["fuel_cost_per_mmbtu"] = [0.5,1,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5]
@@ -191,10 +188,20 @@ class InputValidatorTests(TestCase):
         validator.cross_clean()
         self.assertEqual(validator.is_valid, True)
 
-        self.assertAlmostEqual(len(validator.models["ExistingBoiler"].fuel_cost_per_mmbtu), 8760)
-        self.assertEqual(sum(validator.models["ExistingBoiler"].fuel_cost_per_mmbtu), 9432.0)
-        self.assertAlmostEqual(len(validator.models["Boiler"].fuel_cost_per_mmbtu), 8760)
-        self.assertEqual(sum(validator.models["Boiler"].fuel_cost_per_mmbtu), 9432.0*0.5)
+        self.assertEqual(validator.models["ExistingBoiler"].fuel_cost_per_mmbtu, post["ExistingBoiler"]["fuel_cost_per_mmbtu"])
+        self.assertEqual(validator.models["Boiler"].fuel_cost_per_mmbtu, post["Boiler"]["fuel_cost_per_mmbtu"])
+
+        # Unsupported lengths are rejected
+        post["Boiler"]["fuel_cost_per_mmbtu"] = [0.5, 1.0]
+
+        post["APIMeta"]["run_uuid"] = uuid.uuid4()
+
+        validator = InputValidator(post)
+        validator.clean_fields()
+        validator.clean()
+        validator.cross_clean()
+        self.assertEqual(validator.is_valid, False)
+        self.assertIn("fuel_cost_per_mmbtu", validator.validation_errors["Boiler"])
 
     def test_missing_required_keys(self):
         #start with on_grid, and keep all keys
