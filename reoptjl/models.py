@@ -1307,6 +1307,86 @@ class FinancialOutputs(BaseModel, models.Model):
                     "If the cost of health emissions were included in the objective function," 
                     "calculation of this output value keeps the cost of those emissions at the values input by the user.")
     )
+    pwf_e = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for electricity costs: the annuity over the analysis period at the electricity cost escalation rate and the offtaker discount rate [-]"
+    )
+    pwf_om = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for O&M costs: the annuity over the analysis period at the O&M cost escalation rate and the owner discount rate [-]"
+    )
+    pwf_offtaker = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor over the analysis period at the offtaker discount rate with no escalation [-]"
+    )
+    pwf_owner = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor over the analysis period at the owner discount rate with no escalation [-]"
+    )
+    third_party_factor = models.FloatField(
+        null=True, blank=True,
+        help_text="Ratio of the offtaker to the owner after-tax present worth factors with third party ownership, 1.0 otherwise [-]"
+    )
+    pwf_fuel_existing_boiler = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for ExistingBoiler fuel costs: the annuity over the analysis period at the existing boiler fuel cost escalation rate and the offtaker discount rate. Only if ExistingBoiler is modeled [-]"
+    )
+    pwf_fuel_boiler = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for Boiler fuel costs: the annuity over the analysis period at the boiler fuel cost escalation rate and the offtaker discount rate. Only if Boiler is modeled [-]"
+    )
+    pwf_fuel_generator = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for Generator fuel costs: the annuity over the analysis period at the generator fuel cost escalation rate and the offtaker discount rate. Only if Generator is modeled [-]"
+    )
+    pwf_emissions_cost_CO2_grid = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for the cost of CO2 emissions from grid electricity, accounting for the CO2 cost escalation rate and the grid emissions factor decrease [-]"
+    )
+    pwf_emissions_cost_NOx_grid = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for the cost of NOx emissions from grid electricity, accounting for the NOx cost escalation rate and the grid emissions factor decrease [-]"
+    )
+    pwf_emissions_cost_SO2_grid = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for the cost of SO2 emissions from grid electricity, accounting for the SO2 cost escalation rate and the grid emissions factor decrease [-]"
+    )
+    pwf_emissions_cost_PM25_grid = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for the cost of PM25 emissions from grid electricity, accounting for the PM25 cost escalation rate and the grid emissions factor decrease [-]"
+    )
+    pwf_emissions_cost_CO2_onsite = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for the cost of CO2 emissions from onsite fuel burn, accounting for the CO2 cost escalation rate [-]"
+    )
+    pwf_emissions_cost_NOx_onsite = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for the cost of NOx emissions from onsite fuel burn, accounting for the NOx cost escalation rate [-]"
+    )
+    pwf_emissions_cost_SO2_onsite = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for the cost of SO2 emissions from onsite fuel burn, accounting for the SO2 cost escalation rate [-]"
+    )
+    pwf_emissions_cost_PM25_onsite = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for the cost of PM25 emissions from onsite fuel burn, accounting for the PM25 cost escalation rate [-]"
+    )
+    pwf_grid_emissions_CO2 = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for lifecycle CO2 emissions (lbs) from grid electricity, accounting for the grid emissions factor decrease [-]"
+    )
+    pwf_grid_emissions_NOx = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for lifecycle NOx emissions (lbs) from grid electricity, accounting for the grid emissions factor decrease [-]"
+    )
+    pwf_grid_emissions_SO2 = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for lifecycle SO2 emissions (lbs) from grid electricity, accounting for the grid emissions factor decrease [-]"
+    )
+    pwf_grid_emissions_PM25 = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for lifecycle PM25 emissions (lbs) from grid electricity, accounting for the grid emissions factor decrease [-]"
+    )
 
 class ElectricLoadInputs(BaseModel, models.Model):
     key = "ElectricLoad"
@@ -3316,6 +3396,10 @@ class PVOutputs(BaseModel, models.Model):
 #     station_distance_km = models.FloatField(null=True, blank=True)
     annual_energy_produced_kwh = models.FloatField(null=True, blank=True)
     annual_energy_produced_kwh_bau = models.FloatField(null=True, blank=True)
+    levelization_factor = models.FloatField(
+        null=True, blank=True,
+        help_text="Ratio of the present worth factor of the PV production with degradation to the electricity present worth factor (pwf_e in the Financial outputs). It is multiplied by year_one_energy_produced_kwh to get annual_energy_produced_kwh [-]"
+    )
     annual_energy_exported_kwh = models.FloatField(null=True, blank=True)
     year_one_energy_produced_kwh = models.FloatField(null=True, blank=True)
     year_one_energy_produced_kwh_bau = models.FloatField(null=True, blank=True)
@@ -5434,6 +5518,14 @@ class CHPOutputs(BaseModel, models.Model):
             "Present value of cost of fuel2 consumed by the CHP system, after tax [$]. Only for dual-fuel CHP. "
             "lifecycle_fuel_cost_after_tax is the combined fuel and fuel2 total"
         )
+    )
+    pwf_fuel = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for the CHP fuel cost: the annuity over the analysis period at the CHP fuel cost escalation rate and the offtaker discount rate. With fuel2_switch_start_year it covers only the years before the switch [-]"
+    )
+    pwf_fuel2 = models.FloatField(
+        null=True, blank=True,
+        help_text="Present worth factor for the CHP fuel2 cost: the annuity over the analysis period at the fuel2 cost escalation rate and the offtaker discount rate. Only for dual-fuel CHP. With fuel2_switch_start_year it covers only the years from the switch on, 0.0 if that is beyond the analysis period [-]"
     )
     year_one_standby_cost_before_tax = models.FloatField(
         null=True, blank=True,
