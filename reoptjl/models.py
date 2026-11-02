@@ -5291,6 +5291,16 @@ class CHPInputs(BaseModel, models.Model):
 
         if has_fuel2 and not has_fuel2_cost:
             error_messages["fuel2_cost_per_mmbtu"] = "Must provide fuel2_cost_per_mmbtu when fuel2_type or any other fuel2 input is provided to model {}".format(self.key)
+        if has_fuel2 and not (has_fuel_max_period or has_fuel_max_mmbtu or has_fuel_switch):
+            error_messages["fuel2_type"] = (
+                "fuel2 inputs require either fuel_max_period and fuel_max_mmbtu_per_period (fuel limit) or "
+                "fuel2_switch_start_year (long-term fuel switch), otherwise fuel2 would never be used, to model {}".format(self.key)
+            )
+        if has_fuel_switch and (self.existing_kw or 0) > 0:
+            error_messages["fuel2_switch_start_year"] = (
+                "fuel2_switch_start_year (long-term fuel switch) cannot be combined with existing_kw > 0, because the "
+                "business-as-usual emissions would not reflect the fuel switch, to model {}".format(self.key)
+            )
         if has_fuel_max_period != has_fuel_max_mmbtu:
             error_messages["fuel_max_period"] = "fuel_max_period and fuel_max_mmbtu_per_period must be provided together to model {}".format(self.key)
         if has_fuel_switch and (has_fuel_max_period or has_fuel_max_mmbtu):
