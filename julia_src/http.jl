@@ -188,11 +188,17 @@ function reopt(req::HTTP.Request)
                     :size_class, :electric_efficiency_half_load, :thermal_efficiency_half_load,
                     :macrs_option_years, :macrs_bonus_fraction, :federal_itc_fraction
                 ]
-                if length(model_inputs.s.chps) == 1
-                    chp_dict = Dict(key=>getfield(model_inputs.s.chps[1], key) for key in inputs_with_defaults_from_julia_chp)
-                else
-                    chp_dict = [Dict(key=>getfield(chp, key) for key in inputs_with_defaults_from_julia_chp) for chp in model_inputs.s.chps]
+                chp_dicts = []
+                for chp in model_inputs.s.chps
+                    chp_d = Dict(key=>getfield(chp, key) for key in inputs_with_defaults_from_julia_chp)
+                    # The CHP struct only has the fuel cost escalation rates if they were provided, so fill in their defaults here:
+                    # fuel 1 defaults to the Financial CHP rate and fuel 2 to fuel 1's rate (fuel 2 is left null if not modeled)
+                    esc1, esc2 = reoptjl.chp_fuel_cost_escalation_rates(model_inputs, chp)
+                    chp_d[:fuel_cost_escalation_rate_fraction] = esc1
+                    chp_d[:fuel2_cost_escalation_rate_fraction] = isnothing(chp.fuel2_type) ? nothing : esc2
+                    push!(chp_dicts, chp_d)
                 end
+                chp_dict = length(chp_dicts) == 1 ? chp_dicts[1] : chp_dicts
             else
                 chp_dict = Dict()
             end
