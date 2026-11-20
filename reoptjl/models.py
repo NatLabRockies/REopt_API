@@ -4724,7 +4724,7 @@ class CHPInputs(BaseModel, models.Model):
         default="natural_gas",
         help_text=(
             "Existing CHP fuel type, one of natural_gas, landfill_bio_gas, propane, diesel_oil, custom. If custom, "
-            "fuel_cost_escalation_rate_fraction, fuel_renewable_energy_fraction and all emissions_factor_lb_*_per_mmbtu "
+            "fuel_cost_escalation_rate_fraction and all emissions_factor_lb_*_per_mmbtu "
             "inputs are required."
         )
     )
@@ -5070,7 +5070,7 @@ class CHPInputs(BaseModel, models.Model):
         ],
         blank=True,
         null=True,
-        help_text="Fraction of the CHP fuel considered renewable. Default depends on fuel type. Required if fuel_type is custom."
+        help_text="Fraction of the CHP fuel considered renewable. Default depends on fuel type (1.0 for landfill_bio_gas, otherwise 0.0)."
     )
     emissions_factor_lb_CO2_per_mmbtu = models.FloatField(
         validators=[
@@ -5127,7 +5127,7 @@ class CHPInputs(BaseModel, models.Model):
             "Second CHP fuel type, one of natural_gas, landfill_bio_gas, propane, diesel_oil, custom. Providing "
             "fuel2_type indicates that dual fuel is modeled and requires fuel2_cost_per_mmbtu; if any other fuel2 input "
             "is provided without fuel2_type it defaults to natural_gas (same as fuel_type). If custom, "
-            "fuel2_cost_escalation_rate_fraction, fuel2_renewable_energy_fraction and all fuel2_emissions_factor_lb_*_per_mmbtu "
+            "fuel2_cost_escalation_rate_fraction and all fuel2_emissions_factor_lb_*_per_mmbtu "
             "inputs are required. If provided with fuel_max_period, fuel2_type supplies the fuel needed above the "
             "fuel_type limit; otherwise fuel_max_mmbtu_per_period simply caps the CHP fuel burn."
         )
@@ -5168,7 +5168,7 @@ class CHPInputs(BaseModel, models.Model):
         ],
         blank=True,
         null=True,
-        help_text="Fraction of the CHP fuel2_type considered renewable. Default depends on fuel2_type. Required if fuel2_type is custom."
+        help_text="Fraction of the CHP fuel2_type considered renewable. Default depends on fuel2_type (1.0 for landfill_bio_gas, otherwise 0.0)."
     )
     fuel2_emissions_factor_lb_CO2_per_mmbtu = models.FloatField(
         validators=[
@@ -5255,7 +5255,8 @@ class CHPInputs(BaseModel, models.Model):
     )
 
     # (field, FUEL_DEFAULTS key) pairs for the fuel and fuel2 inputs with defaults that depend on the fuel type.
-    # These (plus the cost escalation rate) have no default, and so are required, when the fuel type is "custom".
+    # These (plus the cost escalation rate) have no default, and so are required, when the fuel type is "custom",
+    # except the renewable energy fractions, which default to 0.0 for a custom fuel.
     FUEL_DEFAULT_FIELDS = (
         ("fuel_renewable_energy_fraction", "fuel_renewable_energy_fraction"),
         ("emissions_factor_lb_CO2_per_mmbtu", "emissions_factor_lb_CO2_per_mmbtu"),
@@ -5270,6 +5271,19 @@ class CHPInputs(BaseModel, models.Model):
         ("fuel2_emissions_factor_lb_NOx_per_mmbtu", "emissions_factor_lb_NOx_per_mmbtu"),
         ("fuel2_emissions_factor_lb_PM25_per_mmbtu", "emissions_factor_lb_PM25_per_mmbtu"),
     )
+
+    def _check_custom_fuel_inputs(self, error_messages, type_name, escalation_field, default_fields):
+        # A custom fuel has no default emissions factors or cost escalation rate. The renewable fraction defaults to 0.0.
+        required = [escalation_field] + [f for f, _ in default_fields if "renewable" not in f]
+        missing = [f for f in required if getattr(self, f) is None]
+        if missing:
+            error_messages[type_name] = "Must provide {} when {} is custom to model {}".format(
+                ", ".join(missing), type_name, self.key)
+
+    def _set_fuel_defaults(self, fuel_type, default_fields):
+        for field, defaults_key in default_fields:
+            if getattr(self, field) is None:
+                setattr(self, field, FUEL_DEFAULTS[defaults_key].get(fuel_type, 0.0))
 
     def clean(self):
         error_messages = {}
@@ -5309,29 +5323,19 @@ class CHPInputs(BaseModel, models.Model):
                 "fuel_max_mmbtu_per_period (fuel limit) to model {}".format(self.key)
             )
 
-        # A custom fuel has no default renewable fraction, emissions factors or cost escalation rate
-        for type_name, fuel_type, required_fields in [
-            ("fuel_type", self.fuel_type,
-             ["fuel_cost_escalation_rate_fraction"] + [f for f, _ in self.FUEL_DEFAULT_FIELDS]),
-            ("fuel2_type", self.fuel2_type,
-             ["fuel2_cost_escalation_rate_fraction"] + [f for f, _ in self.FUEL2_DEFAULT_FIELDS]),
-        ]:
-            if fuel_type == "custom":
-                missing = [f for f in required_fields if getattr(self, f) is None]
-                if missing:
-                    error_messages[type_name] = "Must provide {} when {} is custom to model {}".format(
-                        ", ".join(missing), type_name, self.key)
+        if self.fuel_type == "custom":
+            self._check_custom_fuel_inputs(error_messages, "fuel_type", "fuel_cost_escalation_rate_fraction",
+                                           self.FUEL_DEFAULT_FIELDS)
+        if self.fuel2_type == "custom":
+            self._check_custom_fuel_inputs(error_messages, "fuel2_type", "fuel2_cost_escalation_rate_fraction",
+                                           self.FUEL2_DEFAULT_FIELDS)
 
         if error_messages:
             raise ValidationError(error_messages)
 
-        for fuel_type, default_fields in [(self.fuel_type, self.FUEL_DEFAULT_FIELDS),
-                                          (self.fuel2_type, self.FUEL2_DEFAULT_FIELDS)]:
-            if fuel_type is None or fuel_type == "custom":
-                continue  # no fuel2, or custom values were required above
-            for field, defaults_key in default_fields:
-                if getattr(self, field) is None:
-                    setattr(self, field, FUEL_DEFAULTS[defaults_key].get(fuel_type, 0.0))
+        self._set_fuel_defaults(self.fuel_type, self.FUEL_DEFAULT_FIELDS)
+        if self.fuel2_type is not None:
+            self._set_fuel_defaults(self.fuel2_type, self.FUEL2_DEFAULT_FIELDS)
 
 
 class CHPOutputs(BaseModel, models.Model):
