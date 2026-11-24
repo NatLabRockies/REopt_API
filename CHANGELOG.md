@@ -35,6 +35,14 @@ Classify the change according to the following categories:
 - `reoptjl/migrations/0132_chpoutputs_pwf_fuel_chpoutputs_pwf_fuel2_and_more.py`: Migration for the present worth factor outputs
 ##### Changed
 - `reoptjl/models.py`: Corrected the **CHPInputs.emissions_factor_lb_NOx_per_mmbtu**, **emissions_factor_lb_SO2_per_mmbtu** and **emissions_factor_lb_PM25_per_mmbtu** help text, which described them as CO2
+- Updated the following **Financial** input defaults (set in REopt.jl, based on the 2025 ATB and the EIA's 2026 AEO) from the previous --> new values:
+    - `Financial.elec_cost_escalation_rate_fraction`: 0.0166 --> 0.0253
+    - `Financial.existing_boiler_fuel_cost_escalation_rate_fraction`: 0.0348 --> 0.0464
+    - `Financial.boiler_fuel_cost_escalation_rate_fraction`: 0.0348 --> 0.0464
+    - `Financial.chp_fuel_cost_escalation_rate_fraction`: 0.0348 --> 0.0464
+    - `Financial.generator_fuel_cost_escalation_rate_fraction`: 0.0197 --> 0.0206
+    - `Financial.offtaker_discount_rate_fraction`: 0.0624 --> 0.0586
+    - `Financial.owner_discount_rate_fraction`: 0.0624 --> 0.0586
 
 ## v3.24.1
 ### Patches
