@@ -2,7 +2,7 @@
 
 julia_version = "1.13.2"
 manifest_format = "2.1"
-project_hash = "06c7b44dcd935c2508fdb537c3aa38bfdc2cf02c"
+project_hash = "fa4b984bd52f66dc2042f82fc06be9bf513857a2"
 
 [[deps.ASL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1178,8 +1178,8 @@ version = "1.11.0"
 
 [[deps.REopt]]
 deps = ["ArchGDAL", "CSV", "CoolProp", "DataFrames", "Dates", "DelimitedFiles", "HTTP", "JLD", "JSON", "JuMP", "LinDistFlow", "LinearAlgebra", "Logging", "MathOptInterface", "Requires", "Roots", "Statistics", "TestEnv"]
-git-tree-sha1 = "1a4745510719fdab3c5ba90235dce2737876d536"
-repo-rev = "dual-fuel-chp"
+git-tree-sha1 = "76ec1726c30c29413791fa6c6e9768697528cc7e"
+repo-rev = "master"
 repo-url = "https://github.com/NatLabRockies/REopt.jl.git"
 uuid = "d36ad4e8-d74a-4f7a-ace1-eaea049febf6"
 version = "1.0.1"
