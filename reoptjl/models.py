@@ -4182,7 +4182,7 @@ class GeneratorInputs(BaseModel, models.Model):
         help_text="Diesel generator per unit production (variable) operations and maintenance costs in $/kWh"
     )
     fuel_cost_per_gallon = models.FloatField(
-        default=2.25,
+        default=3.75,
         validators=[
             MinValueValidator(0.0),
             MaxValueValidator(1.0e2)
