@@ -5,7 +5,7 @@ asgiref==3.9.1
 asttokens==3.0.0
 attrs==25.3.0
 autopep8==2.3.2
-azure-core==1.35.0
+azure-core==1.38.0
 backcall==0.2.0
 bandit==1.8.6
 beautifulsoup4==4.13.5
